@@ -1,0 +1,225 @@
+version: '3.8'
+
+services:
+  # MongoDB for all services
+  mongodb:
+    image: mongo:7
+    container_name: lms-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=lms
+    networks:
+      - lms-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/lms --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for sessions and caching
+  redis:
+    image: redis:7-alpine
+    container_name: lms-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Auth Service
+  auth-service:
+    build: ./auth-service
+    container_name: lms-auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=${NODE_ENV:-development}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/lms-auth}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-amberiscoolguy123}
+      - JWT_EXPIRY=${JWT_EXPIRY:-30d}
+      - SESSION_SECRET=${SESSION_SECRET:-amberiscoolguy123-session-secret}
+      - SESSION_EXPIRY=${SESSION_EXPIRY:-2592000}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GITHUB_CALLBACK_URL=${GITHUB_CALLBACK_URL}
+      - COURSE_SERVICE_URL=http://course-service:3004
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+
+
+  # Course Service
+  course-service:
+    build: ./course-service
+    container_name: lms-course-service
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      - NODE_ENV=${NODE_ENV:-development}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/lms-courses}
+      - AUTH_SERVICE_URL=http://auth-service:3001
+    depends_on:
+      - mongodb
+      - auth-service
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # Uploader Service
+  uploader-service:
+    build: ./uploader-service
+    container_name: lms-uploader-service
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/lms-uploader
+      - UPLOAD_DIR=/app/uploads
+      - MAX_FILE_SIZE=10485760
+      - ALLOWED_FILE_TYPES=image/jpeg,image/png,image/gif,image/webp,application/pdf,video/mp4
+      - CDN_URL=
+      - USE_S3=${USE_S3:-false}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_BUCKET_REGION=${S3_BUCKET_REGION:-${AWS_REGION:-us-east-1}}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+    depends_on:
+      - mongodb
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # Community Service
+  community-service:
+    build: ./community-service
+    container_name: lms-community-service
+    ports:
+      - "3009:3009"
+    environment:
+      - PORT=3009
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/lms-community
+      - FRONTEND_URL=http://localhost:5173
+      - COURSE_SERVICE_URL=http://course-service:3004
+    depends_on:
+      - mongodb
+      - course-service
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # Media Service
+  media-service:
+    build: ./media-service
+    container_name: lms-media-service
+    ports:
+      - "3008:3008"
+    environment:
+      - PORT=3008
+      - NODE_ENV=${NODE_ENV:-development}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - DAILYMOTION_API_KEY=${DAILYMOTION_API_KEY}
+      - DAILYMOTION_API_SECRET=${DAILYMOTION_API_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # Admin Service
+  admin-service:
+    build: ./admin-service
+    container_name: lms-admin-service
+    ports:
+      - "3010:3010"
+    environment:
+      - PORT=3010
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      - redis
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # Embed Player Service
+  embed-player-service:
+    build: ./embed-player-service
+    container_name: lms-embed-player-service
+    ports:
+      - "3006:3006"
+    environment:
+      - PORT=3006
+      - NODE_ENV=${NODE_ENV:-development}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    container_name: lms-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - COURSE_SERVICE_URL=http://course-service:3004
+      - UPLOADER_SERVICE_URL=http://uploader-service:3005
+      - MEDIA_SERVICE_URL=http://media-service:3008
+      - COMMUNITY_SERVICE_URL=http://community-service:3009
+      - ADMIN_SERVICE_URL=http://admin-service:3010
+      - EMBED_PLAYER_SERVICE_URL=http://embed-player-service:3006
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      - auth-service
+      - course-service
+      - uploader-service
+      - media-service
+      - community-service
+      - admin-service
+      - embed-player-service
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+networks:
+  lms-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:
+  uploads_data:
+

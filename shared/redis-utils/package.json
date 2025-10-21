@@ -1,0 +1,20 @@
+{
+  "name": "@lms/redis-utils",
+  "version": "1.0.0",
+  "description": "Shared Redis utilities for LMS microservices",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "redis": "^4.6.5",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2"
+  }
+}
+

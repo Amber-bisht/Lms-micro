@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Frontend Service (Production)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+        VITE_API_URL: https://api.lms.amberbisht.me/api
+        VITE_API_BASE_URL: https://api.lms.amberbisht.me
+        VITE_BACKEND_URL: https://api.lms.amberbisht.me
+        VITE_APP_NAME: ${VITE_APP_NAME}
+        VITE_APP_VERSION: ${VITE_APP_VERSION}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        VITE_GITHUB_CLIENT_ID: ${VITE_GITHUB_CLIENT_ID}
+        VITE_YOUTUBE_API_KEY: ${VITE_YOUTUBE_API_KEY}
+        VITE_DAILYMOTION_API_KEY: ${VITE_DAILYMOTION_API_KEY}
+    container_name: lms-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    expose:
+      - "5173"
+    environment:
+      NODE_ENV: production
+    env_file:
+      - .env
+    networks:
+      - lms-frontend-network
+    volumes:
+      - ./public:/app/public
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+networks:
+  lms-frontend-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
