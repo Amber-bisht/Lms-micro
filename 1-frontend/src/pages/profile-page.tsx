@@ -223,7 +223,7 @@ export default function ProfilePage() {
                                 />
                               </div>
                               <CardContent className="p-4">
-                                <Link href={enrollment.course?.slug ? `/r/${enrollment.course.slug}` : `/r/uncategorized/${enrollment.course?._id}`}>
+                                <Link href={enrollment.course?.slug ? `/r/${enrollment.course.slug?.trim()}` : `/r/uncategorized/${enrollment.course?._id}`}>
                                   <a className="text-lg font-medium hover:text-primary">
                                     {enrollment.course?.title}
                                   </a>
@@ -239,7 +239,7 @@ export default function ProfilePage() {
                                   />
                                   <div className="flex justify-between items-center">
                                     <Button asChild variant="outline" size="sm">
-                                      <Link href={enrollment.course?.slug ? `/r/${enrollment.course.slug}` : `/r/uncategorized/${enrollment.course?._id}`}>
+                                      <Link href={enrollment.course?.slug ? `/r/${enrollment.course.slug?.trim()}` : `/r/uncategorized/${enrollment.course?._id}`}>
                                         Continue
                                       </Link>
                                     </Button>
@@ -247,7 +247,7 @@ export default function ProfilePage() {
                                 </div>
                                 {enrollment.course?.videoLinks && enrollment.course.videoLinks.length > 0 && (
                                   <Button asChild variant="outline" size="sm" className="mt-2 w-full">
-                                    <a href={enrollment.course?.slug ? `/course-videos?slug=${enrollment.course.slug.split('/').pop()}` : `/course-videos?id=${enrollment.course?._id}`}>
+                                    <a href={enrollment.course?.slug ? `/course-videos?slug=${enrollment.course.slug?.trim().split('/').pop()}` : `/course-videos?id=${enrollment.course?._id}`}>
                                       Watch Lectures ({enrollment.course.videoLinks.length})
                                     </a>
                                   </Button>

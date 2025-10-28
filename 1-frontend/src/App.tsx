@@ -37,6 +37,7 @@ function Router() {
       <ProtectedRoute path="/profile/edit" component={ProfileEditPage} />
       <ProtectedRoute path="/profile" component={ProfilePage} />
       <Route path="/course/:courseSlug" component={CourseDetail} />
+      <Route path="/course/:courseSlug/learn" component={CourseLearnPage} />
       <Route path="/course/:courseSlug/play" component={CourseVideosPage} />
       
       {/* Admin route protection - redirect to home if not logged in */}

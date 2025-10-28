@@ -159,7 +159,7 @@ export default function HomePage() {
                     <div className="absolute inset-0 bg-gray-200/50 dark:bg-gray-700/50 rounded-3xl transform rotate-1 group-hover:rotate-0 transition-transform duration-500"></div>
                     <div 
                       className="relative bg-white dark:bg-black rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer border border-gray-200 dark:border-gray-800 group-hover:border-gray-400 dark:group-hover:border-gray-600"
-                      onClick={() => navigate(`/course/${course.slug}`)}
+                      onClick={() => navigate(`/course/${course.slug?.trim()}`)}
                     >
                       <div className={`absolute -top-4 -right-4 w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gray-600 dark:bg-gray-700`}>
                         <Code className="w-8 h-8 text-white" />

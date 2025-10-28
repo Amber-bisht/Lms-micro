@@ -4,16 +4,17 @@ import { useParams } from "wouter";
 
 export default function CourseLearnPage() {
   const [_, navigate] = useLocation();
-  const { courseId } = useParams();
+  const { courseSlug } = useParams();
 
   useEffect(() => {
-    // Redirect to course videos page
-    if (courseId) {
-      navigate(`/course-videos?id=${courseId}`);
+    // Trim courseSlug to handle any trailing spaces and redirect to course videos page
+    const trimmedSlug = courseSlug?.trim();
+    if (trimmedSlug) {
+      navigate(`/course/${trimmedSlug}/play`);
     } else {
       navigate("/");
     }
-  }, [courseId, navigate]);
+  }, [courseSlug, navigate]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">

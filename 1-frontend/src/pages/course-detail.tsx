@@ -53,8 +53,8 @@ export default function CourseDetail() {
   const [commentsPage, setCommentsPage] = useState(1);
   const COMMENTS_PAGE_SIZE = 10;
   
-  // Use courseSlug as the identifier
-  const actualCourseId = courseSlug;
+  // Trim courseSlug to handle any trailing spaces that might cause URL encoding issues
+  const actualCourseId = courseSlug?.trim();
   
   console.log('CourseDetail route parameters:', { courseSlug, actualCourseId });
 
@@ -495,7 +495,7 @@ export default function CourseDetail() {
                       {user ? (
                         enrollment?.enrolled ? (
                           <Button className="w-full mt-4" asChild>
-                            <Link href={`/course/${course.slug}/learn`}>
+                            <Link href={`/course/${course.slug?.trim()}/learn`}>
                               Continue Learning
                             </Link>
                           </Button>
@@ -538,7 +538,7 @@ export default function CourseDetail() {
                     {course.videoLinks && course.videoLinks.length > 0 && enrollment?.enrolled && (
                       <div className="mt-4">
                         <Button variant="outline" className="w-full" asChild>
-                          <Link href={`/course/${course.slug}/play`}>
+                          <Link href={`/course/${course.slug?.trim()}/play`}>
                             <Play className="mr-2 h-4 w-4" />
                             View Video Links ({course.videoLinks.length})
                           </Link>

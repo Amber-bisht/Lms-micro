@@ -195,8 +195,8 @@ export default function CourseVideosPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
 
-  // Use courseSlug from URL params
-  const courseIdentifier = courseSlug;
+  // Trim courseSlug to handle any trailing spaces that might cause URL encoding issues
+  const courseIdentifier = courseSlug?.trim();
 
   // All hooks must be called at the top level before any conditional returns
   const { data: course, isLoading } = useQuery({
@@ -459,7 +459,7 @@ export default function CourseVideosPage() {
                 You need to enroll in this course to access the video content.
               </p>
               <div className="space-x-4">
-                <Button onClick={() => navigate(`/course/${course.slug || course._id}`)}>
+                <Button onClick={() => navigate(`/course/${course.slug?.trim() || course._id}`)}>
                   View Course Details
                 </Button>
                 <Button variant="outline" onClick={() => navigate("/")}>
