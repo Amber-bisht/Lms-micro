@@ -21,6 +21,10 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'healthy', service: 'community-service' });
 });
 
+app.get('/api/test', (_req: Request, res: Response) => {
+  res.json({ message: 'Community service is working', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/community', communityRoutes);
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

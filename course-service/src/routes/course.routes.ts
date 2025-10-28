@@ -13,11 +13,18 @@ router.post('/create', courseController.createCourse);
 router.put('/:id', courseController.updateCourse);
 router.delete('/:id', courseController.deleteCourse);
 
+// ============== RATING ENDPOINTS ==============
+router.patch('/:id/rating', courseController.updateCourseRating);
+
 // ============== ENROLLMENT ENDPOINTS ==============
 router.post('/:courseId/enroll', courseController.enrollInCourse);
 router.get('/:courseId/enrollment', courseController.getEnrollmentStatus);
 router.post('/:courseId/complete', courseController.completeCourse);
 router.post('/:courseId/lessons/:lessonId/progress', courseController.updateLessonProgress);
+
+// Slug-based enrollment endpoints
+router.post('/slug/:slug/enroll', courseController.enrollInCourseBySlug);
+router.get('/slug/:slug/enrollment', courseController.getEnrollmentStatusBySlug);
 
 // User enrollment history
 router.get('/user/:userId/enrollments', courseController.getUserEnrollments);

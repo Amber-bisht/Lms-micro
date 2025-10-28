@@ -217,7 +217,7 @@ export default function ProfilePage() {
                             <Card key={enrollment._id || enrollment.course?._id || Math.random()} className="overflow-hidden">
                               <div className="h-32 w-full overflow-hidden">
                                 <img 
-                                  src={enrollment.course?.imageUrl} 
+                                  src={enrollment.course?.thumbnail || '/placeholder-course.jpg'} 
                                   alt={enrollment.course?.title} 
                                   className="w-full h-full object-cover"
                                 />

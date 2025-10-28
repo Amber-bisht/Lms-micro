@@ -5,8 +5,8 @@ import { reviewController } from '../controllers/review.controller';
 const router = Router();
 
 // Comment routes
-router.get('/comments/course/:id', commentController.getComments);
-router.post('/comments/course/:id', commentController.addComment);
+router.get('/comments/:id', commentController.getComments);
+router.post('/comments/:id', commentController.addComment);
 router.delete('/comments/:commentId', commentController.deleteComment);
 
 // Review routes

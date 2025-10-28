@@ -1,8 +1,8 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IReview extends Document {
-  userId: mongoose.Types.ObjectId;
-  courseId: mongoose.Types.ObjectId;
+  userId: string | mongoose.Types.ObjectId;
+  courseId: string | mongoose.Types.ObjectId;
   rating: number;
   comment: string;
   createdAt: Date;
@@ -11,12 +11,12 @@ export interface IReview extends Document {
 
 const reviewSchema = new Schema<IReview>({
   userId: { 
-    type: Schema.Types.ObjectId, 
+    type: Schema.Types.Mixed, 
     ref: 'User',
     required: true
   },
   courseId: { 
-    type: Schema.Types.ObjectId, 
+    type: Schema.Types.Mixed, 
     ref: 'Course',
     required: true
   },

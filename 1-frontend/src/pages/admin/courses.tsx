@@ -75,6 +75,7 @@ interface CourseFormData {
   description: string;
   slug: string;
   thumbnail: string;
+  instructorId?: string;
   isPublished: boolean;
 }
 
@@ -163,7 +164,7 @@ export default function AdminCourses() {
         return;
       }
 
-      await createCourse({ ...formData, instructorId: 'admin' });
+      await createCourse(formData);
       toast({
         title: 'Success',
         description: 'Course created successfully',

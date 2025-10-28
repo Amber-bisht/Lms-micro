@@ -8,19 +8,23 @@ import { initPerformanceMonitoring } from "@/lib/performance-monitor";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Course } from "@/schema";
+import { apiGet } from "@/lib/api";
 
 export default function HomePage() {
   const [_, navigate] = useLocation();
 
   // Fetch all courses
-  const { data: courses = [] } = useQuery<Course[]>({
-    queryKey: ['/api/courses'],
+  const { data: courses = [], isLoading, error } = useQuery<Course[]>({
+    queryKey: ['courses'],
     queryFn: async () => {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}/api/courses`);
-      return res.json();
+      console.log('Fetching courses...');
+      const response = await apiGet('/api/courses');
+      const data = await response.json();
+      console.log('Courses fetched:', data);
+      return data;
     },
+    retry: 3,
+    retryDelay: 1000,
   });
 
   // Initialize performance monitoring
@@ -138,7 +142,17 @@ export default function HomePage() {
               </p>
             </div>
 
-            {courses && courses.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-300">Loading courses...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-12">
+                <p className="text-red-600 dark:text-red-400 mb-4">Error loading courses: {error.message}</p>
+                <Button onClick={() => window.location.reload()}>Retry</Button>
+              </div>
+            ) : courses && courses.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
                 {courses.slice(0, 6).map((course: Course, index: number) => (
                   <div key={course._id || Math.random()} className="group relative">
@@ -153,9 +167,13 @@ export default function HomePage() {
 
                       <div className="relative h-48 w-full overflow-hidden rounded-2xl mb-6">
                         <img 
-                          src={course.imageUrl} 
+                          src={course.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNzUgMTI1SDIyNVYxNzVIMTc1VjEyNVoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTE4NSAxMzVMMjAwIDE1MEwyMTUgMTM1TDIwMCAxMjBMMTg1IDEzNVoiIGZpbGw9IiM2MzY2RjEiLz4KPC9zdmc+'} 
                           alt={course.title} 
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNzUgMTI1SDIyNVYxNzVIMTc1VjEyNVoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTE4NSAxMzVMMjAwIDE1MEwyMTUgMTM1TDIwMCAxMjBMMTg1IDEzNVoiIGZpbGw9IiM2MzY2RjEiLz4KPC9zdmc+';
+                          }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                         <div className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
@@ -189,7 +207,7 @@ export default function HomePage() {
                             </div>
                             <div className="flex items-center space-x-1">
                               <Zap className="w-4 h-4" />
-                              <span>{course.duration}</span>
+                              <span>{course.duration || `${course.lessonCount} lessons`}</span>
                             </div>
                           </div>
                           
@@ -207,8 +225,8 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-300">Loading courses...</p>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">No courses available at the moment.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Check back later for new courses!</p>
               </div>
             )}
           </div>

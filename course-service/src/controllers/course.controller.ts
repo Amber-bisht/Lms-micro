@@ -124,6 +124,82 @@ export const getEnrollmentStatus = async (req: Request, res: Response): Promise<
   }
 };
 
+// Enroll in a course by slug
+export const enrollInCourseBySlug = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { slug } = req.params;
+    const { userId, email, username } = req.body;
+    
+    if (!userId) {
+      res.status(401).json({ message: 'User ID is required' });
+      return;
+    }
+    
+    // Find course by slug
+    const course = await Course.findOne({ slug });
+    if (!course) {
+      res.status(404).json({ message: 'Course not found' });
+      return;
+    }
+    
+    // Check if already enrolled
+    const existingEnrollment = await Enrollment.findOne({ userId, courseId: course._id });
+    if (existingEnrollment) {
+      res.status(400).json({ message: 'User is already enrolled in this course' });
+      return;
+    }
+    
+    // Create enrollment
+    const enrollment = new Enrollment({
+      userId,
+      courseId: course._id,
+      progress: 0,
+      isCompleted: false,
+      completedLessons: [],
+    });
+    
+    await enrollment.save();
+    logger.info(`User ${userId} enrolled in course ${course._id} (slug: ${slug})`);
+    
+    res.status(201).json(enrollment);
+  } catch (error) {
+    logger.error('Error enrolling in course by slug:', error);
+    res.status(500).json({ message: 'Error enrolling in course' });
+  }
+};
+
+// Get enrollment status by slug
+export const getEnrollmentStatusBySlug = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { slug } = req.params;
+    const { userId } = req.query;
+    
+    if (!userId) {
+      res.status(401).json({ message: 'User ID is required' });
+      return;
+    }
+    
+    // Find course by slug
+    const course = await Course.findOne({ slug });
+    if (!course) {
+      res.status(404).json({ message: 'Course not found' });
+      return;
+    }
+    
+    const enrollment = await Enrollment.findOne({ userId, courseId: course._id });
+    
+    if (!enrollment) {
+      res.status(404).json({ enrolled: false });
+      return;
+    }
+    
+    res.status(200).json({ enrolled: true, enrollment });
+  } catch (error) {
+    logger.error('Error checking enrollment status by slug:', error);
+    res.status(500).json({ message: 'Error checking enrollment status' });
+  }
+};
+
 // Get user enrollments
 export const getUserEnrollments = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -238,6 +314,7 @@ export const createCourse = async (req: Request, res: Response): Promise<void> =
       isPublished: isPublished || false,
       lessonCount: 0,
       rating: 0,
+      reviewCount: 0,
     });
     
     await course.save();
@@ -328,6 +405,38 @@ export const deleteCourse = async (req: Request, res: Response): Promise<void> =
   } catch (error) {
     logger.error('Error deleting course:', error);
     res.status(500).json({ message: 'Error deleting course' });
+  }
+};
+
+// Update course rating (called by community service)
+export const updateCourseRating = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { rating, reviewCount } = req.body;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ message: 'Invalid course ID' });
+      return;
+    }
+    
+    const course = await Course.findById(id);
+    if (!course) {
+      res.status(404).json({ message: 'Course not found' });
+      return;
+    }
+    
+    // Update rating and review count
+    course.rating = rating || 0;
+    course.reviewCount = reviewCount || 0;
+    course.updatedAt = new Date();
+    
+    await course.save();
+    
+    logger.info(`Course rating updated: ${id} - Rating: ${rating}, Reviews: ${reviewCount}`);
+    res.status(200).json({ message: 'Course rating updated successfully', course });
+  } catch (error) {
+    logger.error('Error updating course rating:', error);
+    res.status(500).json({ message: 'Error updating course rating' });
   }
 };
 

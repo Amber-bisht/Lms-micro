@@ -39,33 +39,28 @@ export interface ICourse {
   title: string;
   slug: string;
   description: string;
-  longDescription?: string;
-  imageUrl: string;
   instructorId: string;
-  instructorName?: string;
-  instructorImageUrl?: string;
-  postedBy?: string;
-  price?: number;
-  originalPrice?: number;
-  duration: string;
-  level: string;
   lessonCount: number;
-  rating?: number;
-  reviewCount: number;
-  order: number;
-  material: 'hot' | 'normal' | 'cold';
-  learningObjectives: string[];
-  requirements: string[];
-  targetAudience: string[];
-  videoLinks: Array<{ 
+  rating: number;
+  thumbnail?: string;
+  videoLinks?: Array<{ 
     title: string; 
     url: string; 
-    type: 'normal' | 'youtube' | 'dailymotion' | 'aws' | 'wistia' | 'internetarchive' | 'hls-mp4';
-    requiresCookies?: boolean;
+    type: 'youtube';
   }>;
-  enrollmentLink?: string;
+  isPublished: boolean;
   createdAt: Date;
   updatedAt: Date;
+  // Additional fields from backend
+  duration?: string;
+  enrollmentLink?: string;
+  learningObjectives?: string[];
+  level?: string;
+  material?: string;
+  order?: number;
+  requirements?: string[];
+  reviewCount?: number;
+  targetAudience?: string[];
 }
 
 export interface ILesson {
@@ -144,31 +139,26 @@ export const insertCourseSchema = z.object({
   title: z.string().min(3),
   slug: z.string(),
   description: z.string().min(10),
-  longDescription: z.string().optional(),
-  imageUrl: z.string(),
   instructorId: z.string(),
-  instructorName: z.string().optional(),
-  instructorImageUrl: z.string().optional(),
-  postedBy: z.string().optional(),
-  price: z.number().min(0).default(0),
-  originalPrice: z.number().min(0).optional(),
-  duration: z.string(),
-  level: z.enum(['beginner', 'intermediate', 'advanced']).default('beginner'),
   lessonCount: z.number().min(0).default(0),
   rating: z.number().min(0).max(5).default(0),
-  reviewCount: z.number().min(0).default(0),
-  material: z.enum(['hot', 'normal', 'cold']).default('normal'),
-  order: z.number().default(0),
-  learningObjectives: z.array(z.string()).default([]),
-  requirements: z.array(z.string()).default([]),
-  targetAudience: z.array(z.string()).default([]),
-  enrollmentLink: z.string().optional(),
+  thumbnail: z.string().optional(),
   videoLinks: z.array(z.object({
     title: z.string(),
     url: z.string(),
-    type: z.enum(['normal', 'youtube', 'dailymotion', 'aws', 'wistia', 'internetarchive', 'hls-mp4']).default('normal'),
-    requiresCookies: z.boolean().default(false)
-  })).default([])
+    type: z.enum(['youtube']).default('youtube')
+  })).default([]),
+  isPublished: z.boolean().default(false),
+  // Additional fields
+  duration: z.string().optional(),
+  enrollmentLink: z.string().optional(),
+  learningObjectives: z.array(z.string()).default([]),
+  level: z.string().optional(),
+  material: z.string().optional(),
+  order: z.number().default(0),
+  requirements: z.array(z.string()).default([]),
+  reviewCount: z.number().min(0).default(0),
+  targetAudience: z.array(z.string()).default([])
 });
 
 export const insertLessonSchema = z.object({

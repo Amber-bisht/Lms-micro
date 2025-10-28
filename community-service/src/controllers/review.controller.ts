@@ -36,19 +36,26 @@ export const reviewController = {
     try {
       const { courseId, userId, rating, comment } = req.body;
 
+      logger.info(`Creating review - courseId: ${courseId}, userId: ${userId}, rating: ${rating}`);
+
       if (!userId || !courseId || !rating) {
+        logger.error('Missing required fields:', { userId, courseId, rating });
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
       if (rating < 1 || rating > 5) {
+        logger.error('Invalid rating:', rating);
         return res.status(400).json({ message: 'Rating must be between 1 and 5' });
       }
 
+      logger.info('Checking for existing review...');
       const existingReview = await Review.findOne({ courseId, userId });
       if (existingReview) {
+        logger.error('Review already exists:', existingReview._id);
         return res.status(400).json({ message: 'You have already reviewed this course' });
       }
 
+      logger.info('Creating new review...');
       const review = new Review({
         userId,
         courseId,
@@ -57,11 +64,13 @@ export const reviewController = {
       });
 
       await review.save();
+      logger.info(`Review created successfully: ${review._id}`);
 
-      // Update course average rating
-      await updateCourseRating(courseId);
+      // Update course average rating (async, don't wait)
+      updateCourseRating(courseId).catch(error => {
+        logger.error('Failed to update course rating:', error);
+      });
 
-      logger.info(`Review created for course ${courseId} by user ${userId}`);
       res.status(201).json(review);
     } catch (error) {
       logger.error('Error creating review:', error);
@@ -143,16 +152,20 @@ async function updateCourseRating(courseId: string) {
       const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
       const avgRating = totalRating / reviews.length;
       
-      // Call Course Service to update rating
+      // Call Course Service to update rating with timeout
       await axios.patch(`${config.COURSE_SERVICE_URL}/api/courses/${courseId}/rating`, {
         rating: avgRating,
         reviewCount: reviews.length
+      }, {
+        timeout: 5000 // 5 second timeout
       });
     } else {
       // No reviews, reset rating
       await axios.patch(`${config.COURSE_SERVICE_URL}/api/courses/${courseId}/rating`, {
         rating: 0,
         reviewCount: 0
+      }, {
+        timeout: 5000 // 5 second timeout
       });
     }
   } catch (error) {

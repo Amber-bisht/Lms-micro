@@ -13,6 +13,7 @@ export interface ICourse extends Document {
   instructorId: string;
   lessonCount: number;
   rating: number;
+  reviewCount: number;
   thumbnail?: string;
   videoLinks?: IVideoLink[];
   isPublished: boolean;
@@ -27,6 +28,7 @@ const courseSchema = new Schema<ICourse>({
   instructorId: { type: String, required: true },
   lessonCount: { type: Number, default: 0 },
   rating: { type: Number, default: 0 },
+  reviewCount: { type: Number, default: 0 },
   thumbnail: { type: String },
   videoLinks: [{
     title: { type: String, required: true },

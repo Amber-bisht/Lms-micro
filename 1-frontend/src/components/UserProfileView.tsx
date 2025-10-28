@@ -59,7 +59,7 @@ interface UserEnrollment {
   course?: {
     _id: string;
     title: string;
-    imageUrl?: string;
+    thumbnail?: string;
     description?: string;
     slug: string;
   } | null;
@@ -305,9 +305,9 @@ export default function UserProfileView({
                     <Card key={enrollment._id}>
                       <CardContent className="p-4">
                         <div className="flex items-start gap-4">
-                          {enrollment.course?.imageUrl && (
+                          {enrollment.course?.thumbnail && (
                             <img 
-                              src={enrollment.course.imageUrl} 
+                              src={enrollment.course.thumbnail} 
                               alt={enrollment.course?.title || 'Course'}
                               className="w-16 h-16 object-cover rounded-lg"
                             />

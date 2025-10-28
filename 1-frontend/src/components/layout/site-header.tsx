@@ -52,25 +52,23 @@ export function SiteHeader() {
         <div className="flex justify-between h-16">
           {/* Logo and desktop navigation */}
           <div className="flex items-center">
-            <Link href="/">
-              <a className="flex-shrink-0 flex items-center">
-                <Code className="h-8 w-8 text-primary" />
-                <span className="ml-2 text-lg font-bold">LMS</span>
-              </a>
+            <Link href="/" className="flex-shrink-0 flex items-center">
+              <Code className="h-8 w-8 text-primary" />
+              <span className="ml-2 text-lg font-bold">LMS</span>
             </Link>
             
             <nav className="hidden md:ml-6 md:flex md:space-x-8">
               {navItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  <a
-                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                      isActive(item.href)
-                        ? "border-primary text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                    }`}
-                  >
-                    {item.title}
-                  </a>
+                <Link 
+                  key={item.href} 
+                  href={item.href}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                    isActive(item.href)
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                  }`}
+                >
+                  {item.title}
                 </Link>
               ))}
             </nav>
@@ -100,20 +98,16 @@ export function SiteHeader() {
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/profile">
-                      <a className="flex w-full cursor-pointer items-center">
-                        <User className="mr-2 h-4 w-4" />
-                        Profile
-                      </a>
+                    <Link href="/profile" className="flex w-full cursor-pointer items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
                     </Link>
                   </DropdownMenuItem>
                   {user.isAdmin && (
                     <DropdownMenuItem asChild>
-                      <Link href="/admin">
-                        <a className="flex w-full cursor-pointer items-center">
-                          <Shield className="mr-2 h-4 w-4" />
-                          Admin Panel
-                        </a>
+                      <Link href="/admin" className="flex w-full cursor-pointer items-center">
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin Panel
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -155,24 +149,26 @@ export function SiteHeader() {
                   </SheetHeader>
                 <nav className="flex flex-col gap-4 mt-8">
                   {navItems.map((item) => (
-                    <Link key={item.href} href={item.href}>
-                      <a className={`text-sm ${
+                    <Link 
+                      key={item.href} 
+                      href={item.href}
+                      className={`text-sm ${
                         isActive(item.href)
                           ? "font-medium text-primary"
                           : "text-muted-foreground"
-                      }`}>
-                        {item.title}
-                      </a>
+                      }`}
+                    >
+                      {item.title}
                     </Link>
                   ))}
                   {user ? (
                     <>
-                      <Link href="/profile">
-                        <a className="text-sm text-muted-foreground">Profile</a>
+                      <Link href="/profile" className="text-sm text-muted-foreground">
+                        Profile
                       </Link>
                       {user.isAdmin && (
-                        <Link href="/admin">
-                          <a className="text-sm text-muted-foreground">Admin Panel</a>
+                        <Link href="/admin" className="text-sm text-muted-foreground">
+                          Admin Panel
                         </Link>
                       )}
 
@@ -187,8 +183,8 @@ export function SiteHeader() {
                       </Button>
                     </>
                   ) : (
-                    <Link href="/auth">
-                      <a className="text-sm text-muted-foreground">Sign in</a>
+                    <Link href="/auth" className="text-sm text-muted-foreground">
+                      Sign in
                     </Link>
                   )}
                 </nav>

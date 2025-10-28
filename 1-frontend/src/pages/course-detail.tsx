@@ -17,7 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Course, Lesson, Review } from "@shared/schema";
+import { Course, Lesson, Review } from "@/schema";
+import { apiGet, apiPost } from "@/lib/api";
 import { 
   ArrowLeft, 
   BookOpen, 
@@ -62,137 +63,157 @@ export default function CourseDetail() {
   const [comment, setComment] = useState("");
 
   // Course query must come first since other queries depend on it
-  const { data: course, isLoading } = useQuery<Course>({
-    queryKey: [`/api/courses/${actualCourseId}`, 'slug'],
+  const { data: course, isLoading, error } = useQuery<Course>({
+    queryKey: [`course`, actualCourseId],
     queryFn: async () => {
-      // Always use slug endpoint since we're using courseSlug
       console.log('Fetching course by slug:', actualCourseId);
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}/api/courses/slug/${actualCourseId}`, { credentials: 'include' });
-      const data = await res.json();
-      console.log('Course data loaded by slug:', data);
-      return data;
+      const response = await apiGet(`/api/courses/${actualCourseId}`);
+      const data = await response.json();
+      console.log('Raw API response:', data);
+      
+      // Handle case where API returns an array instead of single object
+      let courseData;
+      if (Array.isArray(data)) {
+        if (data.length === 0) {
+          throw new Error('Course not found');
+        }
+        courseData = data[0]; // Return first course from array
+      } else {
+        courseData = data;
+      }
+      
+      console.log('Processed course data:', courseData);
+      console.log('Course _id:', courseData._id);
+      console.log('Course slug:', courseData.slug);
+      return courseData;
     },
     enabled: !!actualCourseId,
+    retry: 3,
+    retryDelay: 1000,
   });
 
   // Comments query - depends on course data
   const { data: commentsData = [], refetch: refetchComments, isFetching: isFetchingComments } = useQuery({
-    queryKey: [`/courses/${course?._id || actualCourseId}/comments`, commentsPage],
+    queryKey: [`comments`, course?._id, commentsPage],
     queryFn: async () => {
-      const courseId = course?._id || actualCourseId;
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}/api/courses/${courseId}/comments?page=${commentsPage}&limit=${COMMENTS_PAGE_SIZE}`, {
-        credentials: "include",
-      });
-      return await res.json();
+      const courseId = course?._id;
+      if (!courseId) return [];
+      
+      console.log('Fetching comments for course:', courseId);
+      const response = await apiGet(`/api/comments/${courseId}?page=${commentsPage}&limit=${COMMENTS_PAGE_SIZE}`);
+      const data = await response.json();
+      console.log('Comments data:', data);
+      return data;
     },
-    enabled: !!(course?._id || actualCourseId),
+    enabled: !!course?._id,
   });
   const comments = commentsData;
 
   // Add comment mutation
   const addCommentMutation = useMutation({
     mutationFn: async (content: string) => {
-      const courseId = course?._id || actualCourseId;
-      // Use the standard endpoint - the backend middleware will resolve slug or ID
-      const endpoint = `/courses/${course?.slug || courseId}/comments`;
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ content }),
+      const courseId = course?._id;
+      const userId = user?._id || user?.id;
+      if (!courseId) throw new Error('Course ID not available');
+      
+      console.log('Adding comment for course:', courseId, 'content:', content);
+      const response = await apiPost(`/api/comments/${courseId}`, {
+        content,
+        userId: userId,
+        username: user?.username,
       });
-      if (!res.ok) throw await res.json();
-      return await res.json();
+      const data = await response.json();
+      console.log('Add comment response:', data);
+      return data;
     },
     onSuccess: () => {
       refetchComments();
       setComment("");
+      toast({ title: "Success", description: "Comment added successfully" });
     },
     onError: (err: any) => {
+      console.error('Add comment error:', err);
       toast({ title: "Error", description: err?.error || "Failed to add comment", variant: "destructive" });
     },
   });
   
   const { data: lessons, isLoading: isLessonsLoading } = useQuery<Lesson[]>({
-    queryKey: [`/api/courses/${course?.slug || course?._id || actualCourseId}/lessons`],
+    queryKey: [`lessons`, course?._id],
     queryFn: async () => {
-      const courseId = course?._id || actualCourseId;
-      // Use the standard endpoint - the backend middleware will resolve slug or ID
-      const endpoint = `/api/courses/${course?.slug || courseId}/lessons`;
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, { credentials: 'include' });
-      return res.json();
+      const courseId = course?._id;
+      if (!courseId) return [];
+      
+      console.log('Fetching lessons for course:', courseId);
+      const response = await apiGet(`/api/courses/${courseId}/lessons`);
+      const data = await response.json();
+      console.log('Lessons data:', data);
+      return data;
     },
-    enabled: !!(course?._id || actualCourseId),
+    enabled: !!course?._id,
+    retry: 3,
+    retryDelay: 1000,
   });
   
-  const { data: reviews, isLoading: isReviewsLoading } = useQuery<Review[]>({
-    queryKey: [`/api/courses/${course?.slug || course?._id || actualCourseId}/reviews`],
+  const { data: reviews = [], isLoading: isReviewsLoading } = useQuery<Review[]>({
+    queryKey: [`reviews`, course?._id],
     queryFn: async () => {
-      const courseId = course?._id || actualCourseId;
-      // Use the standard endpoint - the backend middleware will resolve slug or ID
-      const endpoint = `/api/courses/${course?.slug || courseId}/reviews`;
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, { credentials: 'include' });
-      return res.json();
+      // Reviews functionality temporarily disabled
+      // TODO: Add proper reviews route to API gateway
+      return [];
     },
-    enabled: !!(course?._id || actualCourseId),
+    enabled: false, // Disabled until API gateway is updated
   });
   
   const { data: enrollment, isLoading: isEnrollmentLoading } = useQuery<{ enrolled: boolean }>({
-    queryKey: [`/api/courses/${course?.slug || course?._id || actualCourseId}/enrollment`],
+    queryKey: [`enrollment`, course?.slug, user?._id],
     queryFn: async () => {
-      const courseId = course?._id || actualCourseId;
-      // Use the standard endpoint - the backend middleware will resolve slug or ID
-      const endpoint = `/api/courses/${course?.slug || courseId}/enrollment`;
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, { credentials: 'include' });
-      return res.json();
+      const courseSlug = course?.slug;
+      const userId = user?._id || user?.id;
+      if (!courseSlug || !userId) return { enrolled: false };
+      
+      console.log('Checking enrollment for course slug:', courseSlug, 'user:', userId);
+      const response = await apiGet(`/api/courses/slug/${courseSlug}/enrollment?userId=${userId}`);
+      const data = await response.json();
+      console.log('Enrollment status:', data);
+      return data;
     },
-    enabled: !!(course?._id || actualCourseId) && !!user,
+    enabled: !!(course?.slug && (user?._id || user?.id)),
+    retry: 3,
+    retryDelay: 1000,
   });
   
   const enrollMutation = useMutation({
     mutationFn: async () => {
-      const courseId = course?._id || actualCourseId;
-      // Use the standard endpoint - the backend middleware will resolve slug or ID
-      const endpoint = `/api/courses/${course?.slug || courseId}/enroll`;
+      const courseSlug = course?.slug;
+      const userId = user?._id || user?.id;
+      if (!courseSlug || !userId) {
+        console.error('Enrollment error - Missing data:', { 
+          courseSlug, 
+          userId, 
+          user: user,
+          course: course 
+        });
+        throw new Error('Course slug or user ID not available');
+      }
       
-      console.log('Enrollment attempt:', {
-        courseId,
-        courseSlug: course?.slug,
-        actualCourseId,
-        endpoint,
-        course: course
+      console.log('Attempting enrollment for course slug:', courseSlug, 'user:', userId);
+      const response = await apiPost(`/api/courses/slug/${courseSlug}/enroll`, {
+        userId: userId,
+        email: user.email,
+        username: user.username,
       });
-      
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        credentials: "include",
-      });
-      return await res.json();
+      const data = await response.json();
+      console.log('Enrollment response:', data);
+      return data;
     },
     onSuccess: () => {
-      const courseId = course?._id || actualCourseId;
-      // Invalidate queries using the same identifier
-      const identifier = course?.slug || courseId;
-      queryClient.invalidateQueries({ queryKey: [`/api/courses/${identifier}/enrollment`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/enrollments"] });
+      // Invalidate enrollment query
+      queryClient.invalidateQueries({ queryKey: [`enrollment`, course?.slug, user?._id] });
+      toast({ title: "Success", description: "Successfully enrolled in course!" });
     },
     onError: (err: any) => {
       console.error('Enrollment error:', err);
-      toast({ title: "Error", description: err?.error || "Failed to enroll in course", variant: "destructive" });
+      toast({ title: "Error", description: err?.message || "Failed to enroll in course", variant: "destructive" });
     },
   });
   
@@ -206,19 +227,16 @@ export default function CourseDetail() {
         // Then show redirect notice and redirect
         setShowRedirectNotice(true);
         setTimeout(() => {
-          window.location.href = course.enrollmentLink || '';
+          // Enrollment link not available
         }, 1200); // Show notice for 1.2s before redirect
       } catch (error) {
         console.error('Enrollment failed:', error);
         // Still redirect even if enrollment fails
         setShowRedirectNotice(true);
         setTimeout(() => {
-          window.location.href = course.enrollmentLink || '';
+          // Enrollment link not available
         }, 1200);
       }
-    } else if (course?.enrollmentLink && !user) {
-      // If not logged in, just redirect
-      window.location.href = course.enrollmentLink || '';
     }
   };
 
@@ -238,37 +256,33 @@ export default function CourseDetail() {
   const [hoverRating, setHoverRating] = useState(0);
   const reviewMutation = useMutation({
     mutationFn: async () => {
-      const courseId = course?._id || actualCourseId;
-      // Use the standard endpoint - the backend middleware will resolve slug or ID
-      const endpoint = `/api/courses/${course?.slug || courseId}/reviews`;
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ rating }),
-      });
+      const courseId = course?._id;
+      const userId = user?._id || user?.id;
+      if (!courseId || !userId) throw new Error('Course ID or user ID not available');
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        
-        throw errorData;
-      }
-      return await res.json();
+      console.log('Submitting rating for course:', courseId, 'rating:', rating);
+      const response = await apiPost(`/api/reviews`, {
+        courseId,
+        userId: userId,
+        rating,
+        comment: `Rated ${rating} out of 5 stars`,
+      });
+      const data = await response.json();
+      console.log('Rating response:', data);
+      return data;
     },
     onSuccess: (data) => {
       setLocalUserReview(data); // Optimistically set userReview
-      const courseId = course?._id || actualCourseId;
+      const courseId = course?._id;
       // Invalidate queries using the same identifier
-      const identifier = course?.slug || courseId;
-      queryClient.invalidateQueries({ queryKey: [`/api/courses/${identifier}/reviews`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/courses/${identifier}`] });
+      queryClient.invalidateQueries({ queryKey: [`reviews`, courseId] });
+      queryClient.invalidateQueries({ queryKey: [`course`, courseId] });
       setRating(0);
       toast({ title: "Thank you!", description: "Your rating has been submitted." });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err?.error || "Failed to submit rating", variant: "destructive" });
+      console.error('Rating error:', err);
+      toast({ title: "Error", description: err?.message || "Failed to submit rating", variant: "destructive" });
     },
   });
   
@@ -287,7 +301,24 @@ export default function CourseDetail() {
     );
   }
   
-  if (!course) {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <SiteHeader />
+        <main className="flex-1 py-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-300">Loading course...</p>
+            </div>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  if (error || !course) {
     return (
       <div className="flex flex-col min-h-screen">
         <SiteHeader />
@@ -300,7 +331,7 @@ export default function CourseDetail() {
                 </div>
                 <CardTitle className="mt-4">Course Not Found</CardTitle>
                 <CardDescription>
-                  The course you're looking for doesn't exist or has been removed.
+                  {error ? `Error: ${error.message}` : "The course you're looking for doesn't exist or has been removed."}
                 </CardDescription>
               </CardHeader>
               <CardFooter className="flex justify-center">
@@ -349,11 +380,11 @@ export default function CourseDetail() {
                 <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Clock className="h-4 w-4 mr-1" />
-                    {course.duration}
+                    {course.duration || `${course.lessonCount} lessons`}
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <BookOpen className="h-4 w-4 mr-1" />
-                    {course.lessonCount} lessons
+                    {course.rating || 0}★ rating
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4 mr-1" />
@@ -362,33 +393,22 @@ export default function CourseDetail() {
                   {course.rating && (
                     <div className="flex items-center text-sm text-muted-foreground">
                       <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
-                      {course.rating} ({course.reviewCount} reviews)
+                      {course.rating} ({course.reviewCount || 0} reviews)
                     </div>
                   )}
                 </div>
                 <div className="mt-6 flex items-center">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={course.instructorImageUrl || ""} />
+                    <AvatarImage src="" />
                     <AvatarFallback>
-                      {course.instructorName ? course.instructorName.charAt(0).toUpperCase() : "I"}
+                      I
                     </AvatarFallback>
                   </Avatar>
                   <div className="ml-3">
                     <p className="text-sm font-medium">Instructor</p>
                     <p className="text-xs text-muted-foreground">
-                      {course.instructorName || "Course Instructor"}
+                      Course Instructor
                     </p>
-                    {course.postedBy && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Posted by:{" "}
-                        <Link 
-                          href={`/user/${course.postedBy}`}
-                          className="text-primary hover:underline font-medium"
-                        >
-                          {course.postedBy}
-                        </Link>
-                      </p>
-                    )}
                   </div>
                 </div>
 
@@ -403,30 +423,45 @@ export default function CourseDetail() {
                   <CardContent>
                     <div className="prose dark:prose-invert max-w-none">
                       <h3>Description</h3>
-                      <p>{course.longDescription || course.description}</p>
+                      <p>{course.description}</p>
 
                       <h3 className="mt-8">What you'll learn</h3>
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {course.learningObjectives?.map((objective, i) => (
-                          <li key={i} className="flex items-start">
+                        {course.learningObjectives && course.learningObjectives.length > 0 ? (
+                          course.learningObjectives.map((objective, i) => (
+                            <li key={i} className="flex items-start">
+                              <CheckCircle className="h-5 w-5 mr-2 text-primary flex-shrink-0" />
+                              <span>{objective}</span>
+                            </li>
+                          ))
+                        ) : (
+                          <li className="flex items-start">
                             <CheckCircle className="h-5 w-5 mr-2 text-primary flex-shrink-0" />
-                            <span>{objective}</span>
+                            <span>Master the fundamentals of {course.title}</span>
                           </li>
-                        ))}
+                        )}
                       </ul>
 
                       <h3 className="mt-8">Requirements</h3>
                       <ul>
-                        {course.requirements?.map((requirement, i) => (
-                          <li key={i}>{requirement}</li>
-                        ))}
+                        {course.requirements && course.requirements.length > 0 ? (
+                          course.requirements.map((requirement, i) => (
+                            <li key={i}>{requirement}</li>
+                          ))
+                        ) : (
+                          <li>Basic computer skills</li>
+                        )}
                       </ul>
 
                       <h3 className="mt-8">Who this course is for</h3>
                       <ul>
-                        {course.targetAudience?.map((audience, i) => (
-                          <li key={i}>{audience}</li>
-                        ))}
+                        {course.targetAudience && course.targetAudience.length > 0 ? (
+                          course.targetAudience.map((audience, i) => (
+                            <li key={i}>{audience}</li>
+                          ))
+                        ) : (
+                          <li>Anyone interested in learning {course.title}</li>
+                        )}
                       </ul>
                     </div>
                   </CardContent>
@@ -438,19 +473,20 @@ export default function CourseDetail() {
                   <CardContent className="p-6">
                     <div className="aspect-video w-full overflow-hidden rounded-lg mb-6">
                       <img 
-                        src={course.imageUrl} 
-                        alt={course.title} 
+                        src={course.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNzUgMTI1SDIyNVYxNzVIMTc1VjEyNVoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTE4NSAxMzVMMjAwIDE1MEwyMTUgMTM1TDIwMCAxMjBMMTg1IDEzNVoiIGZpbGw9IiM2MzY2RjEiLz4KPC9zdmc+'} 
+                        alt={course.title || 'Course thumbnail'} 
                         className="w-full h-full object-cover"
+                        onLoad={() => console.log('Image loaded successfully:', course.thumbnail)}
+                        onError={(e) => {
+                          console.error('Image failed to load:', course.thumbnail);
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNzUgMTI1SDIyNVYxNzVIMTc1VjEyNVoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTE4NSAxMzVMMjAwIDE1MEwyMTUgMTM1TDIwMCAxMjBMMTg1IDEzNVoiIGZpbGw9IiM2MzY2RjEiLz4KPC9zdmc+';
+                        }}
                       />
                     </div>
                     
                     <div className="mb-6">
                       <div className="flex flex-col space-y-2">
-                        {course.originalPrice && typeof course.originalPrice === 'number' && course.originalPrice > 0 && (
-                          <span className="text-lg text-muted-foreground line-through">
-                            ₹{course.originalPrice}
-                          </span>
-                        )}
                         <span className="text-2xl font-bold text-green-600">
                           Free
                         </span>
@@ -458,54 +494,19 @@ export default function CourseDetail() {
                       {/* Enrollment logic */}
                       {user ? (
                         enrollment?.enrolled ? (
-                          course.enrollmentLink ? (
-                            // Show Download button if enrolled and has external link and no video links
-                            (!course.videoLinks || course.videoLinks.length === 0) ? (
-                              <Button className="w-full mt-4" asChild>
-                                <a href={course.enrollmentLink}>
-                                  Download
-                                </a>
-                              </Button>
-                            ) : (
-                              <Button className="w-full mt-4" asChild>
-                                <Link href={course?.slug ? `/course/${course.slug}/learn` : `/course/${course?._id || actualCourseId}/learn`}>
-                                  Continue Learning
-                                </Link>
-                              </Button>
-                            )
-                          ) : (
-                            <Button className="w-full mt-4" asChild>
-                              <Link href={`/course/${course.slug}/play`}>
-                                <Play className="mr-2 h-4 w-4" />
-                                Continue Learning
-                              </Link>
-                            </Button>
-                          )
+                          <Button className="w-full mt-4" asChild>
+                            <Link href={`/course/${course.slug}/learn`}>
+                              Continue Learning
+                            </Link>
+                          </Button>
                         ) : (
-                          course.enrollmentLink ? (
-                            <>
-                              <Button 
-                                className="w-full mt-4" 
-                                onClick={handleExternalEnroll}
-                                disabled={enrollMutation.isPending || isEnrollmentLoading}
-                              >
-                                {enrollMutation.isPending ? "Enrolling..." : "Enroll Now"}
-                              </Button>
-                              {showRedirectNotice && (
-                                <div className="mt-2 text-center text-sm text-primary">
-                                  Redirecting to external enrollment page...
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <Button 
-                              className="w-full mt-4" 
-                              onClick={() => enrollMutation.mutate()}
-                              disabled={enrollMutation.isPending || isEnrollmentLoading}
-                            >
-                              {enrollMutation.isPending ? "Enrolling..." : "Enroll Now"}
-                            </Button>
-                          )
+                          <Button 
+                            className="w-full mt-4" 
+                            onClick={() => enrollMutation.mutate()}
+                            disabled={enrollMutation.isPending || isEnrollmentLoading}
+                          >
+                            {enrollMutation.isPending ? "Enrolling..." : "Enroll Now"}
+                          </Button>
                         )
                       ) : (
                         <Button className="w-full mt-4" asChild>
@@ -526,10 +527,7 @@ export default function CourseDetail() {
                           />
                         ))}
                         <span className="ml-2 text-sm text-muted-foreground">
-                          {course.rating ? course.rating.toFixed(1) : "0.0"}
-                          {typeof course.reviewCount === 'number' && (
-                            <> ({course.reviewCount} reviews)</>
-                          )}
+                          {course.rating ? course.rating.toFixed(1) : "0.0"} ({course.reviewCount || 0} reviews)
                         </span>
                       </div>
                       <div className="text-sm text-muted-foreground">
@@ -560,9 +558,57 @@ export default function CourseDetail() {
         {/* Course Content */}
         <section className="py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Remove the Tabs for Syllabus and Reviews and their content */}
-            {/* The Accordion for lessons is removed as per the edit hint */}
-            {/* The reviews section is removed as per the edit hint */}
+            <h2 className="text-3xl font-bold mb-8">Course Content</h2>
+            
+            {isLessonsLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-300">Loading lessons...</p>
+              </div>
+            ) : lessons && lessons.length > 0 ? (
+              <Accordion type="single" collapsible className="w-full">
+                {lessons.map((lesson, index) => (
+                  <AccordionItem key={lesson._id || index} value={`lesson-${index}`}>
+                    <AccordionTrigger className="text-left">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">{lesson.title}</h3>
+                          <p className="text-sm text-muted-foreground">{lesson.description}</p>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="pl-11">
+                        {lesson.content && (
+                          <div className="prose dark:prose-invert max-w-none mb-4">
+                            <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
+                          </div>
+                        )}
+                        {lesson.videoUrl && (
+                          <div className="mb-4">
+                            <video controls className="w-full max-w-2xl rounded-lg">
+                              <source src={lesson.videoUrl} type="video/mp4" />
+                              Your browser does not support the video tag.
+                            </video>
+                          </div>
+                        )}
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4 mr-1" />
+                          <span>{lesson.duration || 'Duration not specified'}</span>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-600 dark:text-gray-300">No lessons available for this course yet.</p>
+              </div>
+            )}
           </div>
         </section>
 

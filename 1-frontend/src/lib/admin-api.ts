@@ -26,11 +26,12 @@ export const createCourse = async (courseData: {
   title: string;
   description: string;
   slug: string;
+  instructorId?: string;
   thumbnail?: string;
   videoLinks?: string[];
   isPublished?: boolean;
 }) => {
-  const response = await apiPost('/api/courses/create', { ...courseData, instructorId: 'admin' });
+  const response = await apiPost('/api/courses/create', { ...courseData, instructorId: courseData.instructorId || 'admin' });
   return response.json();
 };
 

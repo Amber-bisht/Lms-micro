@@ -76,6 +76,25 @@ app.get('/health', async (_req: Request, res: Response) => {
   }
 });
 
+// Test direct reviews endpoint
+app.post('/api/test-reviews', async (req: Request, res: Response) => {
+  try {
+    logger.info(`[TEST-REVIEWS] Direct call to community service`);
+    const response = await axios.post(`${config.COMMUNITY_SERVICE_URL}/api/community/reviews`, req.body, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000
+    });
+    res.status(response.status).json(response.data);
+  } catch (error: any) {
+    logger.error(`[TEST-REVIEWS] Error: ${error.message}`);
+    res.status(error.response?.status || 500).json(
+      error.response?.data || { message: 'Reviews service unavailable' }
+    );
+  }
+});
+
 // ==================== AUTH SERVICE ROUTES ====================
 app.use('/api/auth', createProxyMiddleware({
   target: config.AUTH_SERVICE_URL,
@@ -122,7 +141,14 @@ app.use('/api/courses', async (req: Request, res: Response) => {
         const queryString = req.url.split('?')[1];
         targetUrl += `?${queryString}`;
       }
-    } else if (req.path.match(/\/[a-f0-9]{24}\/(comments|lessons|reviews|enrollment|enroll|complete|completion)/)) {
+    } else if (req.path.match(/\/slug\/[^\/]+\/(enrollment|enroll)/)) {
+      // Handle slug-based enrollment routes
+      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
+      if (req.url.includes('?')) {
+        const queryString = req.url.split('?')[1];
+        targetUrl += `?${queryString}`;
+      }
+    } else if (req.path.match(/\/[a-f0-9]{24}\/(comments|lessons|enrollment|enroll|complete|completion)/)) {
       targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
       if (req.url.includes('?')) {
         const queryString = req.url.split('?')[1];
@@ -202,17 +228,58 @@ app.use('/api/videos', async (req: Request, res: Response) => {
 });
 
 // ==================== COMMENTS SERVICE ROUTES ====================
-app.use('/api/comments', createProxyMiddleware({
-  target: config.COMMUNITY_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/comments': '/api/community/comments'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Comments service error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Comments service unavailable' });
-  },
-}));
+app.use('/api/comments', async (req: Request, res: Response) => {
+  try {
+    logger.info(`[COMMENTS] Direct call: ${req.method} ${req.path}`);
+    
+    const targetUrl = `${config.COMMUNITY_SERVICE_URL}/api/community/comments${req.path}`;
+    
+    const response = await axios({
+      method: req.method as any,
+      url: targetUrl,
+      data: req.body,
+      headers: {
+        'Content-Type': 'application/json',
+        ...req.headers
+      },
+      timeout: 10000
+    });
+    
+    res.status(response.status).json(response.data);
+  } catch (error: any) {
+    logger.error(`[COMMENTS] Direct call error: ${error.message}`);
+    res.status(error.response?.status || 500).json(
+      error.response?.data || { message: 'Comments service unavailable' }
+    );
+  }
+});
+
+// ==================== REVIEWS SERVICE ROUTES ====================
+app.use('/api/reviews', async (req: Request, res: Response) => {
+  try {
+    logger.info(`[REVIEWS] Direct call: ${req.method} ${req.path}`);
+    
+    const targetUrl = `${config.COMMUNITY_SERVICE_URL}/api/community/reviews`;
+    
+    const response = await axios({
+      method: req.method as any,
+      url: targetUrl,
+      data: req.body,
+      headers: {
+        'Content-Type': 'application/json',
+        ...req.headers
+      },
+      timeout: 10000
+    });
+    
+    res.status(response.status).json(response.data);
+  } catch (error: any) {
+    logger.error(`[REVIEWS] Direct call error: ${error.message}`);
+    res.status(error.response?.status || 500).json(
+      error.response?.data || { message: 'Reviews service unavailable' }
+    );
+  }
+});
 
 // ==================== ADMIN SERVICE ROUTES ====================
 app.use('/api/admin', createProxyMiddleware({

@@ -27,21 +27,17 @@ export function SiteFooter() {
     <footer className="bg-background border-t">
       <div className="max-w-7xl mx-auto py-12 px-4 overflow-hidden sm:px-6 lg:px-8">
         <div className="mb-8 flex justify-center">
-          <Link href="/">
-            <a className="flex items-center">
-              <Code className="h-6 w-6 text-primary" />
-              <span className="ml-2 text-lg font-bold">LMS</span>
-            </a>
+          <Link href="/" className="flex items-center">
+            <Code className="h-6 w-6 text-primary" />
+            <span className="ml-2 text-lg font-bold">LMS</span>
           </Link>
         </div>
         
         <nav className="-mx-5 -my-2 flex flex-wrap justify-center" aria-label="Footer">
           {footerLinks.map((link) => (
             <div key={link.title} className="px-5 py-2">
-              <Link href={link.href}>
-                <a className="text-base text-muted-foreground hover:text-foreground">
-                  {link.title}
-                </a>
+              <Link href={link.href} className="text-base text-muted-foreground hover:text-foreground">
+                {link.title}
               </Link>
             </div>
           ))}
