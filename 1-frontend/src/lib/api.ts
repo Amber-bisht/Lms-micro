@@ -19,15 +19,19 @@ export const apiRequest = async (
   data?: unknown,
   options: RequestInit = {}
 ): Promise<Response> => {
-  const url = endpoint.startsWith('http') ? endpoint : `${API_URL}${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+  
+  // Check if data is FormData to avoid setting Content-Type header
+  const isFormData = data instanceof FormData;
   
   const response = await fetch(url, {
     method,
     headers: {
-      'Content-Type': 'application/json',
+      // Don't set Content-Type for FormData - let browser set it with boundary
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
-    body: data ? JSON.stringify(data) : undefined,
+    body: isFormData ? data : (data ? JSON.stringify(data) : undefined),
     credentials: 'include',
     ...options,
   });

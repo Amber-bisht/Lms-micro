@@ -9,14 +9,19 @@ import axios from 'axios';
 const app = express();
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
 // CORS configuration
 app.use(cors({
-  origin: config.NODE_ENV === 'production' 
-    ? ['https://lms.amberbisht.me', 'https://www.lms.amberbisht.me']
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5000'],
+  origin: [
+    'https://lms.amberbisht.me', 
+    'https://www.lms.amberbisht.me',
+    'http://localhost:3000', 
+    'http://localhost:5173', 
+    'http://localhost:5000',
+    'http://lms.amberbisht.me'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie', 'Accept'],
@@ -35,7 +40,6 @@ app.get('/health', async (_req: Request, res: Response) => {
       auth: `${config.AUTH_SERVICE_URL}/health`,
       course: `${config.COURSE_SERVICE_URL}/health`,
       uploader: `${config.UPLOADER_SERVICE_URL}/health`,
-      media: `${config.MEDIA_SERVICE_URL}/health`,
       community: `${config.COMMUNITY_SERVICE_URL}/health`,
       admin: `${config.ADMIN_SERVICE_URL}/health`,
     };
@@ -76,21 +80,15 @@ app.get('/health', async (_req: Request, res: Response) => {
 app.use('/api/auth', createProxyMiddleware({
   target: config.AUTH_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: {
-    '^/api/auth/blocked-ips/([^/]+)$': '/api/auth/blocked-ips/$1',
-    '^/api/auth': '/api/auth'
-  },
   cookieDomainRewrite: {
     '*': 'localhost'
   },
   onProxyReq: (proxyReq, req, res) => {
-    // Forward cookies from the original request
     if (req.headers.cookie) {
       proxyReq.setHeader('cookie', req.headers.cookie);
     }
   },
   onProxyRes: (proxyRes, req, res) => {
-    // Forward cookies from the auth service response
     if (proxyRes.headers['set-cookie']) {
       proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map(cookie => {
         return cookie.replace(/Domain=.*?;/, 'Domain=localhost;');
@@ -103,31 +101,44 @@ app.use('/api/auth', createProxyMiddleware({
   },
 }));
 
-
-
 // ==================== COURSE SERVICE ROUTES ====================
-// Courses route (frontend calls /api/courses) - Direct axios call instead of proxy
 app.use('/api/courses', async (req: Request, res: Response) => {
   try {
     logger.info(`[COURSES] Direct call: ${req.method} ${req.path}`);
-    logger.info(`[COURSES] Request body: ${JSON.stringify(req.body)}`);
     
-    // Handle different course routes
     let targetUrl = `${config.COURSE_SERVICE_URL}/api/courses`;
+    
+    // Preserve query parameters
+    if (req.url.includes('?')) {
+      const queryString = req.url.split('?')[1];
+      targetUrl += `?${queryString}`;
+    }
     
     // Handle specific course routes with path parameters
     if (req.path.includes('/slug/')) {
       const slug = req.path.split('/slug/')[1];
       targetUrl = `${config.COURSE_SERVICE_URL}/api/courses/slug/${slug}`;
-    } else if (req.path.match(/\/[^\/]+\/(comments|lessons|reviews|enrollment|enroll|complete|completion)/)) {
-      // Handle routes like /api/courses/{id}/comments, /api/courses/{id}/lessons, etc.
-      targetUrl = `${config.COURSE_SERVICE_URL}${req.path}`;
-    } else if (req.path.match(/\/[^\/]+\/lessons\/[^\/]+\/complete/)) {
-      // Handle routes like /api/courses/{id}/lessons/{lessonId}/complete
-      targetUrl = `${config.COURSE_SERVICE_URL}${req.path}`;
-    } else if (req.method === 'POST' && req.path === '/') {
-      // Handle course creation - the course service expects POST /create
+      if (req.url.includes('?')) {
+        const queryString = req.url.split('?')[1];
+        targetUrl += `?${queryString}`;
+      }
+    } else if (req.path.match(/\/[a-f0-9]{24}\/(comments|lessons|reviews|enrollment|enroll|complete|completion)/)) {
+      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
+      if (req.url.includes('?')) {
+        const queryString = req.url.split('?')[1];
+        targetUrl += `?${queryString}`;
+      }
+    } else if (req.path.match(/\/[a-f0-9]{24}\/lessons\/[a-f0-9]{24}\/complete/)) {
+      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
+      if (req.url.includes('?')) {
+        const queryString = req.url.split('?')[1];
+        targetUrl += `?${queryString}`;
+      }
+    } else if (req.method === 'POST' && req.path === '/create') {
       targetUrl = `${config.COURSE_SERVICE_URL}/api/courses/create`;
+    } else if ((req.method === 'PUT' || req.method === 'DELETE') && req.path.match(/^\/[a-f0-9]{24}$/)) {
+      // Handle PUT/DELETE requests with MongoDB ObjectId (24 hex characters)
+      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
     }
     
     const response = await axios({
@@ -141,241 +152,71 @@ app.use('/api/courses', async (req: Request, res: Response) => {
       timeout: 10000
     });
     
-    logger.info(`[COURSES] Response status: ${response.status}`);
     res.status(response.status).json(response.data);
   } catch (error: any) {
     logger.error(`[COURSES] Direct call error: ${error.message}`);
-    logger.error(`[COURSES] Error details: ${JSON.stringify(error.response?.data || error.message)}`);
     res.status(error.response?.status || 500).json(
       error.response?.data || { message: 'Course service unavailable' }
     );
   }
 });
 
-// ==================== UPLOADER SERVICE ROUTES ====================
-app.use('/api/upload', createProxyMiddleware({
-  target: config.UPLOADER_SERVICE_URL,
-  changeOrigin: true,
-  onError: (err, req, res) => {
-    logger.error(`Uploader service error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Uploader service unavailable' });
-  },
-}));
-
-// Video routes (frontend calls /api/videos)
-app.use('/api/videos', createProxyMiddleware({
-  target: config.UPLOADER_SERVICE_URL,
+// ==================== LESSON ROUTES ====================
+app.use('/api/lessons', createProxyMiddleware({
+  target: config.COURSE_SERVICE_URL,
   changeOrigin: true,
   pathRewrite: {
-    '^/api/videos': '/api/videos'
+    '^/api/lessons': '/api/courses/lessons'
   },
   onError: (err, req, res) => {
-    logger.error(`Video service error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Video service unavailable' });
+    logger.error(`Lesson service error: ${err.message}`);
+    (res as Response).status(503).json({ message: 'Lesson service unavailable' });
   },
 }));
 
+// ==================== VIDEO SERVICE ROUTES ====================
+app.use('/api/videos', async (req: Request, res: Response) => {
+  try {
+    logger.info(`[VIDEOS] Direct call: ${req.method} ${req.path}`);
+    
+    const targetUrl = `${config.UPLOADER_SERVICE_URL}/api/videos${req.path}`;
+    
+    const response = await axios({
+      method: req.method as any,
+      url: targetUrl,
+      data: req.body,
+      headers: {
+        'Content-Type': 'application/json',
+        ...req.headers
+      },
+      timeout: 10000
+    });
+    
+    res.status(response.status).json(response.data);
+  } catch (error: any) {
+    logger.error(`[VIDEOS] Direct call error: ${error.message}`);
+    res.status(error.response?.status || 500).json(
+      error.response?.data || { message: 'Video service unavailable' }
+    );
+  }
+});
 
-
-
-
-// ==================== COMMUNITY SERVICE ROUTES ====================
-app.use('/api/community', createProxyMiddleware({
+// ==================== COMMENTS SERVICE ROUTES ====================
+app.use('/api/comments', createProxyMiddleware({
   target: config.COMMUNITY_SERVICE_URL,
   changeOrigin: true,
+  pathRewrite: {
+    '^/api/comments': '/api/community/comments'
+  },
   onError: (err, req, res) => {
-    logger.error(`Community service error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Community service unavailable' });
+    logger.error(`Comments service error: ${err.message}`);
+    (res as Response).status(503).json({ message: 'Comments service unavailable' });
   },
 }));
-
-// ==================== MEDIA SERVICE ROUTES ====================
-app.use('/api/media', createProxyMiddleware({
-  target: config.MEDIA_SERVICE_URL,
-  changeOrigin: true,
-  onError: (err, req, res) => {
-    logger.error(`Media service error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Media service unavailable' });
-  },
-}));
-
 
 // ==================== ADMIN SERVICE ROUTES ====================
-// Admin routes are handled below with proper path rewriting
-
-
-// ==================== ADDITIONAL ROUTES FOR FRONTEND COMPATIBILITY ====================
-
-// Authentication routes (frontend calls /api/login, /api/logout, etc.)
-app.use('/api/login', createProxyMiddleware({
-  target: config.AUTH_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/login': '/api/auth/login'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Login route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Auth service unavailable' });
-  },
-}));
-
-app.use('/api/logout', createProxyMiddleware({
-  target: config.AUTH_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/logout': '/api/auth/logout'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Logout route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Auth service unavailable' });
-  },
-}));
-
-app.use('/api/profile', createProxyMiddleware({
-  target: config.AUTH_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/profile': '/api/auth/profile'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Profile route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Profile service unavailable' });
-  },
-}));
-
-app.use('/api/admin-login-google', createProxyMiddleware({
-  target: config.AUTH_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/admin-login-google': '/api/auth/admin-login-google'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Admin login route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Auth service unavailable' });
-  },
-}));
-
-
-
-// User profile route (frontend calls /api/user)
-app.use('/api/user', createProxyMiddleware({
-  target: config.AUTH_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/user': '/api/auth/profile'
-  },
-  onError: (err, req, res) => {
-    logger.error(`User route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'User service unavailable' });
-  },
-}));
-
-// Profile routes (frontend calls /api/profile/*)
-app.use('/api/profile', createProxyMiddleware({
-  target: config.AUTH_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/profile/user/enrollments$': '/api/auth/profile/user/enrollments',
-    '^/api/profile': '/api/auth/profile'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Profile route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Profile service unavailable' });
-  },
-}));
-
-
-
-// Users route (frontend calls /api/users)
-app.use('/api/users', createProxyMiddleware({
-  target: config.AUTH_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/users': '/api/auth/users'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Users route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Users service unavailable' });
-  },
-}));
-
-// Comments route (frontend calls /api/comments)
-app.use('/api/comments', createProxyMiddleware({
-  target: config.COMMUNITY_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/comments': '/api/community/comments'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Comments route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Comments service unavailable' });
-  },
-}));
-
-
-
-
-
-// Users route (frontend calls /api/users)
-app.use('/api/users', createProxyMiddleware({
-  target: config.AUTH_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/users': '/api/auth/users'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Users route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Users service unavailable' });
-  },
-}));
-
-// Comments route (frontend calls /api/comments)
-app.use('/api/comments', createProxyMiddleware({
-  target: config.COMMUNITY_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/comments': '/api/community/comments'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Comments route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Comments service unavailable' });
-  },
-}));
-
-// Media routes (frontend calls /api/dailymotion, /api/youtube)
-app.use('/api/dailymotion', createProxyMiddleware({
-  target: config.MEDIA_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/dailymotion/test-playlist/([^/]+)$': '/api/media/dailymotion/test-playlist/$1',
-    '^/api/dailymotion/playlist/([^/]+)$': '/api/media/dailymotion/playlist/$1',
-    '^/api/dailymotion/parse$': '/api/media/dailymotion/parse',
-    '^/api/dailymotion': '/api/media/dailymotion'
-  },
-  onError: (err, req, res) => {
-    logger.error(`Dailymotion route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Dailymotion service unavailable' });
-  },
-}));
-
-app.use('/api/youtube', createProxyMiddleware({
-  target: config.MEDIA_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/youtube/playlist/([^/]+)$': '/api/media/youtube/playlist/$1',
-    '^/api/youtube/parse$': '/api/media/youtube/parse',
-    '^/api/youtube': '/api/media/youtube'
-  },
-  onError: (err, req, res) => {
-    logger.error(`YouTube route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'YouTube service unavailable' });
-  },
-}));
-
-
-// Admin routes (frontend calls /api/admin/*)
 app.use('/api/admin', createProxyMiddleware({
-  target: config.ADMIN_SERVICE_URL, // Admin routes go to admin service
+  target: config.ADMIN_SERVICE_URL,
   changeOrigin: true,
   pathRewrite: {
     '^/api/admin/users/([^/]+)/ban$': '/api/auth/admin/users/$1/ban',
@@ -390,14 +231,12 @@ app.use('/api/admin', createProxyMiddleware({
   },
 }));
 
-// ==================== CUSTOM ENROLLMENT ROUTE (with user info injection) ====================
-// This endpoint adds user info to the request body before proxying to course service
+// ==================== CUSTOM ENROLLMENT ROUTE ====================
 app.post('/api/courses/:courseId/enroll', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { courseId } = req.params;
     const user = (req as any).user;
     
-    // Forward request to course service with user info
     const response = await axios.post(
       `${config.COURSE_SERVICE_URL}/api/courses/${courseId}/enroll`,
       {
@@ -422,7 +261,6 @@ app.post('/api/courses/:courseId/complete', authMiddleware, async (req: Request,
     const { courseId } = req.params;
     const user = (req as any).user;
     
-    // Forward request to course service with user info
     const response = await axios.post(
       `${config.COURSE_SERVICE_URL}/api/courses/${courseId}/complete`,
       {
@@ -463,8 +301,6 @@ app.listen(PORT, '0.0.0.0', () => {
   logger.info(`  - Auth: ${config.AUTH_SERVICE_URL}`);
   logger.info(`  - Courses: ${config.COURSE_SERVICE_URL}`);
   logger.info(`  - Uploader: ${config.UPLOADER_SERVICE_URL}`);
-  logger.info(`  - Media: ${config.MEDIA_SERVICE_URL}`);
   logger.info(`  - Community: ${config.COMMUNITY_SERVICE_URL}`);
   logger.info(`  - Admin: ${config.ADMIN_SERVICE_URL}`);
 });
-

@@ -8,9 +8,15 @@ import axios from 'axios';
 import config from '../config/config';
 
 // Get all courses
-export const getAllCourses = async (_req: Request, res: Response): Promise<void> => {
+export const getAllCourses = async (req: Request, res: Response): Promise<void> => {
   try {
-    const courses = await Course.find({ isPublished: true });
+    // Check if this is an admin request (from admin dashboard)
+    const isAdminRequest = req.headers['x-admin-request'] === 'true' || 
+                          req.path.includes('/admin') ||
+                          req.query.admin === 'true';
+    
+    const query = isAdminRequest ? {} : { isPublished: true };
+    const courses = await Course.find(query);
     res.status(200).json(courses);
   } catch (error) {
     logger.error('Error fetching courses:', error);
@@ -372,7 +378,7 @@ export const getLessonById = async (req: Request, res: Response): Promise<void> 
 export const createLesson = async (req: Request, res: Response): Promise<void> => {
   try {
     const { courseId } = req.params;
-    const { title, description, content, youtubeUrl, duration, order } = req.body;
+    const { title, description, content, videoId, order } = req.body;
     
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
       res.status(400).json({ message: 'Invalid course ID' });
@@ -389,10 +395,9 @@ export const createLesson = async (req: Request, res: Response): Promise<void> =
       title,
       description,
       content,
-      youtubeUrl,
+      videoId,
       courseId,
       order: order || (await Lesson.countDocuments({ courseId })) + 1,
-      duration: duration || 30,
     });
     
     await lesson.save();
@@ -409,7 +414,7 @@ export const createLesson = async (req: Request, res: Response): Promise<void> =
 export const updateLesson = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, description, content, youtubeUrl, duration, order } = req.body;
+    const { title, description, content, videoId, order } = req.body;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ message: 'Invalid lesson ID' });
@@ -428,8 +433,7 @@ export const updateLesson = async (req: Request, res: Response): Promise<void> =
         title: title || lesson.title,
         description: description || lesson.description,
         content: content || lesson.content,
-        youtubeUrl: youtubeUrl !== undefined ? youtubeUrl : lesson.youtubeUrl,
-        duration: duration || lesson.duration,
+        videoId: videoId !== undefined ? videoId : lesson.videoId,
         order: order || lesson.order,
       },
       { new: true }

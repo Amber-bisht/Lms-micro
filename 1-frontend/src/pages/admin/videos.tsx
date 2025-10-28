@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Plus, Trash2, Loader2, Video, Youtube, Link as LinkIcon } from 'lucide-react';
-import { apiGet, apiPost, apiDelete } from '@/lib/api';
+import { Upload, Plus, Trash2, Loader2, Video, Youtube, Link as LinkIcon, BarChart3 } from 'lucide-react';
+import { getAllVideos, uploadVideo, addYouTubeVideo, addExternalHLSVideo, deleteVideo } from '@/lib/admin-api';
 
 interface Video {
   _id: string;
@@ -48,8 +48,7 @@ export default function AdminVideosPage() {
 
   const fetchVideos = async () => {
     try {
-      const response = await apiGet('/api/videos');
-      const data = await response.json();
+      const data = await getAllVideos();
       setVideos(data);
     } catch (error) {
       console.error('Error fetching videos:', error);
@@ -80,11 +79,7 @@ export default function AdminVideosPage() {
       formData.append('video', uploadFile);
       formData.append('title', uploadTitle);
 
-      const response = await apiPost('/api/videos/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      await uploadVideo(formData);
 
       toast({
         title: 'Success',
@@ -103,7 +98,7 @@ export default function AdminVideosPage() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to upload video',
+        description: error.message || 'Failed to upload video',
         variant: 'destructive',
       });
     } finally {
@@ -123,7 +118,7 @@ export default function AdminVideosPage() {
     }
 
     try {
-      const response = await apiPost('/api/videos/youtube', {
+      await addYouTubeVideo({
         title: youtubeTitle,
         youtubeUrl,
       });
@@ -140,7 +135,7 @@ export default function AdminVideosPage() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to add YouTube video',
+        description: error.message || 'Failed to add YouTube video',
         variant: 'destructive',
       });
     }
@@ -167,7 +162,7 @@ export default function AdminVideosPage() {
     }
 
     try {
-      const response = await apiPost('/api/videos/external-hls', {
+      await addExternalHLSVideo({
         title: hlsTitle,
         hlsUrl,
       });
@@ -184,7 +179,7 @@ export default function AdminVideosPage() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to add HLS video',
+        description: error.message || 'Failed to add HLS video',
         variant: 'destructive',
       });
     }
@@ -196,7 +191,7 @@ export default function AdminVideosPage() {
     }
 
     try {
-      await apiDelete(`/api/videos/${videoId}`);
+      await deleteVideo(videoId);
       
       toast({
         title: 'Success',
@@ -207,7 +202,7 @@ export default function AdminVideosPage() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete video',
+        description: error.message || 'Failed to delete video',
         variant: 'destructive',
       });
     }
@@ -255,7 +250,10 @@ export default function AdminVideosPage() {
           <h1 className="text-3xl font-bold">Video Management</h1>
           <p className="text-muted-foreground mt-2">Upload and manage videos for your courses</p>
         </div>
-        <Button onClick={() => setLocation('/admin/dashboard')}>Back to Dashboard</Button>
+        <Button onClick={() => setLocation('/admin/dashboard')}>
+          <BarChart3 className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
       </div>
 
       <Tabs defaultValue="upload" className="mb-8">

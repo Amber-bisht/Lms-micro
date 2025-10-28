@@ -4,10 +4,9 @@ export interface ILesson extends Document {
   title: string;
   description: string;
   content: string;
-  youtubeUrl?: string;
+  videoId?: string; // Reference to video in uploader service
   courseId: mongoose.Types.ObjectId;
   order: number;
-  duration: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,8 +26,9 @@ const lessonSchema = new Schema<ILesson>({
     type: String,
     required: [true, 'Content is required']
   },
-  youtubeUrl: { 
-    type: String
+  videoId: { 
+    type: String,
+    ref: 'Video' // Reference to video in uploader service
   },
   courseId: {
     type: Schema.Types.ObjectId,
@@ -39,11 +39,6 @@ const lessonSchema = new Schema<ILesson>({
     type: Number,
     required: [true, 'Order is required'],
     default: 0
-  },
-  duration: {
-    type: Number,
-    required: [true, 'Duration is required in minutes'],
-    min: [1, 'Duration must be at least 1 minute']
   },
 }, { 
   timestamps: true,

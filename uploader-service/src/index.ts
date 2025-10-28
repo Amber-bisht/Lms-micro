@@ -14,7 +14,19 @@ import { updateVideoStatus } from './controllers/video.controller';
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://lms.amberbisht.me', 
+    'https://www.lms.amberbisht.me',
+    'http://localhost:3000', 
+    'http://localhost:5173', 
+    'http://localhost:5000',
+    'http://lms.amberbisht.me'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie', 'Accept'],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

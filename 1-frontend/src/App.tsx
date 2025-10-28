@@ -16,6 +16,8 @@ import ProfileEditPage from "@/pages/profile-edit";
 import CourseDetail from "@/pages/course-detail";
 
 import AdminVideos from "@/pages/admin/videos";
+import AdminDashboard from "@/pages/admin/dashboard";
+import AdminCourses from "@/pages/admin/courses-video-integration";
 import CourseVideosPage from "@/pages/course-videos";
 import CourseLearnPage from "@/pages/course-learn";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -42,7 +44,9 @@ function Router() {
         <AdminRouteProtection />
       </Route>
       
+      <AdminProtectedRoute path="/admin/dashboard" component={AdminDashboard} />
       <AdminProtectedRoute path="/admin/videos" component={AdminVideos} />
+      <AdminProtectedRoute path="/admin/courses" component={AdminCourses} />
 
       <ProtectedRoute path="/course-videos" component={CourseVideosPage} />
 
