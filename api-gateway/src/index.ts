@@ -38,7 +38,6 @@ app.get('/health', async (_req: Request, res: Response) => {
       media: `${config.MEDIA_SERVICE_URL}/health`,
       community: `${config.COMMUNITY_SERVICE_URL}/health`,
       admin: `${config.ADMIN_SERVICE_URL}/health`,
-      embedPlayer: `${config.EMBED_PLAYER_SERVICE_URL}/api/embed/health`,
     };
 
     const healthChecks = await Promise.allSettled(
@@ -163,6 +162,19 @@ app.use('/api/upload', createProxyMiddleware({
   },
 }));
 
+// Video routes (frontend calls /api/videos)
+app.use('/api/videos', createProxyMiddleware({
+  target: config.UPLOADER_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/videos': '/api/videos'
+  },
+  onError: (err, req, res) => {
+    logger.error(`Video service error: ${err.message}`);
+    (res as Response).status(503).json({ message: 'Video service unavailable' });
+  },
+}));
+
 
 
 
@@ -187,15 +199,6 @@ app.use('/api/media', createProxyMiddleware({
   },
 }));
 
-// ==================== EMBED PLAYER SERVICE ROUTES ====================
-app.use('/api/embed', createProxyMiddleware({
-  target: config.EMBED_PLAYER_SERVICE_URL,
-  changeOrigin: true,
-  onError: (err, req, res) => {
-    logger.error(`Embed player service error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Embed player service unavailable' });
-  },
-}));
 
 // ==================== ADMIN SERVICE ROUTES ====================
 // Admin routes are handled below with proper path rewriting
@@ -463,6 +466,5 @@ app.listen(PORT, '0.0.0.0', () => {
   logger.info(`  - Media: ${config.MEDIA_SERVICE_URL}`);
   logger.info(`  - Community: ${config.COMMUNITY_SERVICE_URL}`);
   logger.info(`  - Admin: ${config.ADMIN_SERVICE_URL}`);
-  logger.info(`  - Embed Player: ${config.EMBED_PLAYER_SERVICE_URL}`);
 });
 

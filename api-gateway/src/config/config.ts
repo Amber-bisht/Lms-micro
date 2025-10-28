@@ -11,7 +11,6 @@ export default {
   MEDIA_SERVICE_URL: process.env.MEDIA_SERVICE_URL || 'http://localhost:3008',
   COMMUNITY_SERVICE_URL: process.env.COMMUNITY_SERVICE_URL || 'http://localhost:3009',
   ADMIN_SERVICE_URL: process.env.ADMIN_SERVICE_URL || 'http://localhost:3010',
-  EMBED_PLAYER_SERVICE_URL: process.env.EMBED_PLAYER_SERVICE_URL || 'http://localhost:3006',
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
 };
 

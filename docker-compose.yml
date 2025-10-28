@@ -97,8 +97,11 @@ services:
       - PORT=3005
       - NODE_ENV=development
       - MONGODB_URI=mongodb://mongodb:27017/lms-uploader
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - UPLOAD_DIR=/app/uploads
       - MAX_FILE_SIZE=10485760
+      - MAX_VIDEO_SIZE=524288000
       - ALLOWED_FILE_TYPES=image/jpeg,image/png,image/gif,image/webp,application/pdf,video/mp4
       - CDN_URL=
       - USE_S3=${USE_S3:-false}
@@ -110,6 +113,7 @@ services:
       - S3_ENDPOINT=${S3_ENDPOINT}
     depends_on:
       - mongodb
+      - redis
     volumes:
       - uploads_data:/app/uploads
     networks:
@@ -169,23 +173,6 @@ services:
       - lms-network
     restart: unless-stopped
 
-  # Embed Player Service
-  embed-player-service:
-    build: ./embed-player-service
-    container_name: lms-embed-player-service
-    ports:
-      - "3006:3006"
-    environment:
-      - PORT=3006
-      - NODE_ENV=${NODE_ENV:-development}
-      - CORS_ORIGIN=${CORS_ORIGIN:-*}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - MONGODB_URI=mongodb://mongodb:27017/lms-embed-player
-    depends_on:
-      - mongodb
-    networks:
-      - lms-network
-    restart: unless-stopped
 
 
   # API Gateway
@@ -203,7 +190,6 @@ services:
       - MEDIA_SERVICE_URL=http://media-service:3008
       - COMMUNITY_SERVICE_URL=http://community-service:3009
       - ADMIN_SERVICE_URL=http://admin-service:3010
-      - EMBED_PLAYER_SERVICE_URL=http://embed-player-service:3006
       - FRONTEND_URL=http://localhost:5173
     depends_on:
       - auth-service
@@ -212,7 +198,6 @@ services:
       - media-service
       - community-service
       - admin-service
-      - embed-player-service
     networks:
       - lms-network
     restart: unless-stopped

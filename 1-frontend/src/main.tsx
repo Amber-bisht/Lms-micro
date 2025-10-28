@@ -1,8 +1,6 @@
 import { createRoot, hydrateRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import AdminCommentsPage from './pages/admin/comments';
-import AdminUsersPage from './pages/admin/users';
 import NotFoundPage from './pages/not-found';
 
 // Check if we have dehydrated state from SSR

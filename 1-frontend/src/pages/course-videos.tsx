@@ -19,7 +19,7 @@ import { isYouTubeVideo } from "@/lib/youtube-utils";
 import { LessonCompletionToggle } from "@/components/lesson-completion";
 import { CourseProgress } from "@/components/course-progress";
 
-// Enhanced Video Player Component - Using Embed Player Service
+// Enhanced Video Player Component - Direct YouTube Embed
 const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }: { 
   video: any; 
   onVideoChange: (index: number) => void; 
@@ -37,14 +37,16 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
 
   const handleIframeError = () => {
     setIsLoading(false);
-    setError('Failed to load embedded video player');
+    setError('Failed to load video player');
   };
 
-  // Generate embedded player URL using the embed player service
+  // Generate direct YouTube embed URL
   const getEmbeddedPlayerUrl = () => {
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-    const embedUrl = `${API_BASE_URL}/api/embed/player?videoUrl=${encodeURIComponent(video.url)}&autoplay=false&controls=true`;
-    return embedUrl;
+    if (isYouTubeVideo(video.url)) {
+      const videoId = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)?.[1];
+      return `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&rel=0&modestbranding=1`;
+    }
+    return video.url;
   };
 
   const embeddedUrl = getEmbeddedPlayerUrl();
