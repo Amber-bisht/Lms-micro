@@ -2,14 +2,20 @@ import Bull, { Job } from 'bull';
 import redis from 'ioredis';
 import { logger } from './logger';
 
-const redisClient = new redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379', 10),
-  maxRetriesPerRequest: null,
-});
+// Create separate Redis clients for Bull queue
+// Bull requires separate clients for client and subscriber without certain options
+const createRedisClient = (type: 'client' | 'subscriber') => {
+  return new redis({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    // Remove maxRetriesPerRequest and enableReadyCheck for Bull compatibility
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
+};
 
 export const videoQueue = new Bull('video-processing', {
-  createClient: () => redisClient,
+  createClient: (type: 'client' | 'subscriber') => createRedisClient(type),
 });
 
 export interface VideoProcessingJob {
