@@ -8,30 +8,131 @@ import {
   getYouTubeVideoInfo,
   YouTubeVideoInfo 
 } from '../utils/youtube-utils';
+import VideoSession from '../models/VideoSession';
+import config from '../config/config';
+import crypto from 'crypto';
 
-// Get embed player HTML for a video
+// Generate a secure token for video session
+const generateToken = (): string => {
+  return crypto.randomBytes(32).toString('hex');
+};
+
+// Create a new video session with token
+export const createVideoSession = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { videoId, courseId, userId } = req.body;
+
+    if (!videoId || !courseId || !userId) {
+      res.status(400).json({ 
+        message: 'videoId, courseId, and userId are required' 
+      });
+      return;
+    }
+
+    // Validate YouTube video ID
+    if (!isValidYouTubeUrl(`https://www.youtube.com/watch?v=${videoId}`)) {
+      res.status(400).json({ 
+        message: 'Invalid YouTube video ID' 
+      });
+      return;
+    }
+
+    // Generate token and embed URL
+    const token = generateToken();
+    const embedUrl = generateYouTubeEmbedUrl(videoId, {
+      autoplay: false,
+      controls: true,
+      rel: 0,
+      modestbranding: 1,
+      fs: 1
+    });
+
+    // Set expiration time (24 hours from now)
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    // Create video session
+    const videoSession = new VideoSession({
+      videoId,
+      courseId,
+      userId,
+      token,
+      embedUrl,
+      expiresAt,
+      isActive: true
+    });
+
+    await videoSession.save();
+
+    logger.info(`Video session created: ${videoId} for course ${courseId} by user ${userId}`);
+
+    res.status(201).json({
+      success: true,
+      token,
+      embedUrl,
+      expiresAt,
+      sessionId: videoSession._id
+    });
+  } catch (error) {
+    logger.error('Error creating video session:', error);
+    res.status(500).json({ message: 'Error creating video session' });
+  }
+};
+
+// Get video session by token
+export const getVideoSession = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+
+    const videoSession = await VideoSession.findOne({ 
+      token, 
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!videoSession) {
+      res.status(404).json({ 
+        message: 'Video session not found or expired' 
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      videoId: videoSession.videoId,
+      courseId: videoSession.courseId,
+      userId: videoSession.userId,
+      embedUrl: videoSession.embedUrl,
+      expiresAt: videoSession.expiresAt,
+      isActive: videoSession.isActive
+    });
+  } catch (error) {
+    logger.error('Error getting video session:', error);
+    res.status(500).json({ message: 'Error getting video session' });
+  }
+};
+
+// Get embed player HTML using token
 export const getEmbedPlayer = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { videoUrl, autoplay = false, controls = true, start, end, loop = false, mute = false } = req.query;
+    const { token } = req.params;
+    const { autoplay = false, controls = true, start, end, loop = false, mute = false } = req.query;
 
-    if (!videoUrl || typeof videoUrl !== 'string') {
-      res.status(400).json({ message: 'Video URL is required' });
+    const videoSession = await VideoSession.findOne({ 
+      token, 
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!videoSession) {
+      res.status(404).json({ 
+        message: 'Video session not found or expired' 
+      });
       return;
     }
 
-    // Check if it's a valid YouTube URL
-    if (!isValidYouTubeUrl(videoUrl)) {
-      res.status(400).json({ message: 'Only YouTube URLs are supported' });
-      return;
-    }
-
-    const videoId = extractYouTubeVideoId(videoUrl);
-    if (!videoId) {
-      res.status(400).json({ message: 'Invalid YouTube URL' });
-      return;
-    }
-
-    const embedUrl = generateYouTubeEmbedUrl(videoId, {
+    // Generate embed URL with custom parameters
+    const embedUrl = generateYouTubeEmbedUrl(videoSession.videoId, {
       autoplay: autoplay === 'true',
       controls: controls === 'true',
       start: start ? parseInt(start as string) : undefined,
@@ -40,15 +141,13 @@ export const getEmbedPlayer = async (req: Request, res: Response): Promise<void>
       mute: mute === 'true'
     });
 
-    const thumbnail = generateYouTubeThumbnail(videoId);
-
     const embedHtml = `
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Video Player</title>
+        <title>Video Player - Course ${videoSession.courseId}</title>
         <style>
           body {
             margin: 0;
@@ -84,9 +183,23 @@ export const getEmbedPlayer = async (req: Request, res: Response): Promise<void>
             color: white;
             font-size: 18px;
           }
+          .session-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 10;
+          }
         </style>
       </head>
       <body>
+        <div class="session-info">
+          Course: ${videoSession.courseId} | Video: ${videoSession.videoId}
+        </div>
         <div class="player-container">
           <div class="loading" id="loading">Loading video...</div>
           <iframe 
@@ -109,68 +222,101 @@ export const getEmbedPlayer = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// Get video information
+// Get video information by token
 export const getVideoInfo = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { videoUrl } = req.query;
+    const { token } = req.params;
 
-    if (!videoUrl || typeof videoUrl !== 'string') {
-      res.status(400).json({ message: 'Video URL is required' });
+    const videoSession = await VideoSession.findOne({ 
+      token, 
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!videoSession) {
+      res.status(404).json({ 
+        message: 'Video session not found or expired' 
+      });
       return;
     }
 
-    if (!isValidYouTubeUrl(videoUrl)) {
-      res.status(400).json({ message: 'Only YouTube URLs are supported' });
-      return;
-    }
-
-    const videoInfo = getYouTubeVideoInfo(videoUrl);
-    if (!videoInfo) {
-      res.status(400).json({ message: 'Invalid YouTube URL' });
-      return;
-    }
-
-    res.status(200).json(videoInfo);
+    const videoInfo = getYouTubeVideoInfo(`https://www.youtube.com/watch?v=${videoSession.videoId}`);
+    
+    res.status(200).json({
+      success: true,
+      videoId: videoSession.videoId,
+      courseId: videoSession.courseId,
+      embedUrl: videoSession.embedUrl,
+      thumbnail: generateYouTubeThumbnail(videoSession.videoId),
+      expiresAt: videoSession.expiresAt,
+      ...videoInfo
+    });
   } catch (error) {
     logger.error('Error getting video info:', error);
     res.status(500).json({ message: 'Error getting video info' });
   }
 };
 
-// Get embed URL for iframe
-export const getEmbedUrl = async (req: Request, res: Response): Promise<void> => {
+// Deactivate video session
+export const deactivateVideoSession = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { videoUrl, autoplay = false, controls = true, start, end, loop = false, mute = false } = req.query;
+    const { token } = req.params;
+    const { userId } = req.body;
 
-    if (!videoUrl || typeof videoUrl !== 'string') {
-      res.status(400).json({ message: 'Video URL is required' });
-      return;
-    }
-
-    if (!isValidYouTubeUrl(videoUrl)) {
-      res.status(400).json({ message: 'Only YouTube URLs are supported' });
-      return;
-    }
-
-    const videoId = extractYouTubeVideoId(videoUrl);
-    if (!videoId) {
-      res.status(400).json({ message: 'Invalid YouTube URL' });
-      return;
-    }
-
-    const embedUrl = generateYouTubeEmbedUrl(videoId, {
-      autoplay: autoplay === 'true',
-      controls: controls === 'true',
-      start: start ? parseInt(start as string) : undefined,
-      end: end ? parseInt(end as string) : undefined,
-      loop: loop === 'true',
-      mute: mute === 'true'
+    const videoSession = await VideoSession.findOne({ 
+      token, 
+      userId,
+      isActive: true 
     });
 
-    res.status(200).json({ embedUrl, videoId });
+    if (!videoSession) {
+      res.status(404).json({ 
+        message: 'Video session not found' 
+      });
+      return;
+    }
+
+    videoSession.isActive = false;
+    await videoSession.save();
+
+    logger.info(`Video session deactivated: ${token} by user ${userId}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Video session deactivated successfully'
+    });
   } catch (error) {
-    logger.error('Error generating embed URL:', error);
-    res.status(500).json({ message: 'Error generating embed URL' });
+    logger.error('Error deactivating video session:', error);
+    res.status(500).json({ message: 'Error deactivating video session' });
+  }
+};
+
+// Get user's active video sessions
+export const getUserVideoSessions = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+
+    const videoSessions = await VideoSession.find({ 
+      userId, 
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      sessions: videoSessions.map(session => ({
+        sessionId: session._id,
+        videoId: session.videoId,
+        courseId: session.courseId,
+        token: session.token,
+        embedUrl: session.embedUrl,
+        expiresAt: session.expiresAt,
+        createdAt: session.createdAt
+      }))
+    });
+  } catch (error) {
+    logger.error('Error getting user video sessions:', error);
+    res.status(500).json({ message: 'Error getting user video sessions' });
   }
 };
 

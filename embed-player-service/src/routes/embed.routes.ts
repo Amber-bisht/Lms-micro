@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { 
+  createVideoSession,
+  getVideoSession,
   getEmbedPlayer, 
   getVideoInfo, 
-  getEmbedUrl, 
+  deactivateVideoSession,
+  getUserVideoSessions,
   healthCheck 
 } from '../controllers/embed.controller';
 
@@ -11,13 +14,22 @@ const router = Router();
 // Health check
 router.get('/health', healthCheck);
 
-// Get embed player HTML
-router.get('/player', getEmbedPlayer);
+// Create a new video session
+router.post('/session', createVideoSession);
 
-// Get video information
-router.get('/info', getVideoInfo);
+// Get video session by token
+router.get('/session/:token', getVideoSession);
 
-// Get embed URL for iframe
-router.get('/url', getEmbedUrl);
+// Get embed player HTML using token
+router.get('/player/:token', getEmbedPlayer);
+
+// Get video information by token
+router.get('/info/:token', getVideoInfo);
+
+// Deactivate video session
+router.put('/session/:token/deactivate', deactivateVideoSession);
+
+// Get user's active video sessions
+router.get('/user/:userId/sessions', getUserVideoSessions);
 
 export default router;

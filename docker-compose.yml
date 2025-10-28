@@ -180,6 +180,9 @@ services:
       - NODE_ENV=${NODE_ENV:-development}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MONGODB_URI=mongodb://mongodb:27017/lms-embed-player
+    depends_on:
+      - mongodb
     networks:
       - lms-network
     restart: unless-stopped

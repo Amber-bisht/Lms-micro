@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import mongoose from 'mongoose';
 import config from './config/config';
 import { logger } from './utils/logger';
 import embedRoutes from './routes/embed.routes';
@@ -34,9 +35,12 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/api/embed/health',
-      player: '/api/embed/player?videoUrl=YOUTUBE_URL',
-      info: '/api/embed/info?videoUrl=YOUTUBE_URL',
-      url: '/api/embed/url?videoUrl=YOUTUBE_URL'
+      createSession: 'POST /api/embed/session',
+      getSession: 'GET /api/embed/session/:token',
+      player: 'GET /api/embed/player/:token',
+      info: 'GET /api/embed/info/:token',
+      deactivate: 'PUT /api/embed/session/:token/deactivate',
+      userSessions: 'GET /api/embed/user/:userId/sessions'
     }
   });
 });
@@ -52,11 +56,29 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-const PORT = config.port;
+// Connect to MongoDB
+const connectToDatabase = async () => {
+  try {
+    await mongoose.connect(config.mongodbUri);
+    logger.info('✅ Connected to MongoDB');
+  } catch (error) {
+    logger.error('❌ MongoDB connection error:', error);
+    process.exit(1);
+  }
+};
 
-app.listen(PORT, () => {
-  logger.info(`Embed Player Service running on port ${PORT}`);
-  logger.info(`Environment: ${config.nodeEnv}`);
-});
+// Start server
+const startServer = async () => {
+  await connectToDatabase();
+  
+  const PORT = config.port;
+  app.listen(PORT, '0.0.0.0', () => {
+    logger.info(`🚀 Embed Player Service running on port ${PORT}`);
+    logger.info(`Environment: ${config.nodeEnv}`);
+    logger.info(`MongoDB: ${config.mongodbUri}`);
+  });
+};
+
+startServer();
 
 export default app;
