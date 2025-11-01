@@ -19,6 +19,9 @@ router.get('/user/:userId', videoController.getUserVideos);
 // Get video by ID
 router.get('/:id', videoController.getVideoById);
 
+// Stream HLS playlist with presigned URLs (for private S3 videos)
+router.get('/:id/playlist.m3u8', videoController.getSignedPlaylist);
+
 // Delete video
 router.delete('/:id', videoController.deleteVideo);
 

@@ -297,8 +297,18 @@ export default function CourseVideosPage() {
     queryFn: async () => {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
       if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}/api/courses/${courseIdentifier}/reviews`);
-      return res.json();
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/courses/${courseIdentifier}/reviews`);
+        if (!res.ok) {
+          console.warn('Reviews API failed:', res.status);
+          return [];
+        }
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
+        return [];
+      }
     },
     enabled: !!courseIdentifier,
   });
@@ -511,7 +521,8 @@ export default function CourseVideosPage() {
   }, [videoLinks.length, currentVideoIndex]);
 
   const comments = Array.isArray(commentsData) ? commentsData : [];
-  const userReview = localUserReview || reviews.find((r: any) => {
+  const reviewsArray = Array.isArray(reviews) ? reviews : [];
+  const userReview = localUserReview || reviewsArray.find((r: any) => {
     const reviewUserId = r.userId?._id || (r.userId as any)?.id || r.userId;
     const currentUserId = user?._id;
 

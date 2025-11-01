@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { videoQueue } from '../utils/video-queue';
 import s3Service from '../utils/s3-service';
 import config from '../config/config';
+import { getSignedPlaylistFromS3 } from '../utils/playlist-signer';
 
 // Upload video file (MP4)
 export const uploadVideo = async (req: Request, res: Response): Promise<void> => {
@@ -227,10 +228,90 @@ export const getVideoById = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    res.status(200).json(video);
+    // For S3-stored videos, return the signed playlist endpoint URL
+    const videoResponse: any = video.toObject();
+    
+    if (video.storageType === 's3') {
+      try {
+        // For HLS videos, point to our signed playlist endpoint
+        // This endpoint will serve the playlist with all .ts segments signed
+        const baseUrl = config.UPLOADER_SERVICE_URL || `http://localhost:${config.PORT}`;
+        
+        if (video.hls720S3Key) {
+          videoResponse.hls720Url = `${baseUrl}/api/videos/${video._id}/playlist.m3u8`;
+          logger.info(`Set signed playlist URL for 720p: ${video._id}`);
+        }
+        
+        if (video.hls1080S3Key) {
+          videoResponse.hls1080Url = `${baseUrl}/api/videos/${video._id}/playlist.m3u8`;
+          logger.info(`Set signed playlist URL for 1080p: ${video._id}`);
+        }
+        
+        // Generate presigned URL for original file (direct download)
+        if (video.originalS3Key) {
+          const presignedUrlOriginal = await s3Service.generatePresignedDownloadUrl(
+            video.originalS3Key,
+            7200 // 2 hours
+          );
+          videoResponse.originalUrl = presignedUrlOriginal;
+        }
+      } catch (s3Error) {
+        logger.error('Error generating URLs:', s3Error);
+        // Continue with original URLs if generation fails
+      }
+    }
+
+    res.status(200).json(videoResponse);
   } catch (error) {
     logger.error('Get video by ID error:', error);
     res.status(500).json({ message: 'Error fetching video' });
+  }
+};
+
+// Get signed HLS playlist with presigned URLs for all segments
+export const getSignedPlaylist = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const video = await Video.findById(id);
+
+    if (!video) {
+      res.status(404).json({ message: 'Video not found' });
+      return;
+    }
+
+    // Only works for S3-stored videos
+    if (video.storageType !== 's3') {
+      res.status(400).json({ message: 'This endpoint only works for S3-stored videos' });
+      return;
+    }
+
+    // Determine which quality playlist to serve (prefer 1080p, fallback to 720p)
+    let playlistS3Key: string | undefined;
+    
+    if (video.hls1080S3Key) {
+      playlistS3Key = video.hls1080S3Key;
+    } else if (video.hls720S3Key) {
+      playlistS3Key = video.hls720S3Key;
+    }
+
+    if (!playlistS3Key) {
+      res.status(404).json({ message: 'No HLS playlist found for this video' });
+      return;
+    }
+
+    // Get the signed playlist with all segments signed
+    const signedPlaylistContent = await getSignedPlaylistFromS3(playlistS3Key, 7200);
+
+    // Set appropriate headers for HLS playlist
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    res.status(200).send(signedPlaylistContent);
+    logger.info(`Served signed playlist for video: ${id}`);
+  } catch (error) {
+    logger.error('Get signed playlist error:', error);
+    res.status(500).json({ message: 'Error generating signed playlist' });
   }
 };
 

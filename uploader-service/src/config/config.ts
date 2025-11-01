@@ -6,6 +6,7 @@ export default {
   PORT: parseInt(process.env.PORT || '3005', 10),
   NODE_ENV: process.env.NODE_ENV || 'development',
   MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/lms-uploader',
+  UPLOADER_SERVICE_URL: process.env.UPLOADER_SERVICE_URL || 'http://localhost:3005',
   MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE || '10485760', 10), // 10MB default
   MAX_VIDEO_SIZE: parseInt(process.env.MAX_VIDEO_SIZE || '524288000', 10), // 500MB default
   ALLOWED_FILE_TYPES: (process.env.ALLOWED_FILE_TYPES || 'image/jpeg,image/png,image/gif,image/webp,application/pdf,video/mp4').split(','),
