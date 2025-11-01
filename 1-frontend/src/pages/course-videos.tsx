@@ -18,8 +18,9 @@ import { formatDistanceToNow } from "date-fns";
 import { isYouTubeVideo } from "@/lib/youtube-utils";
 import { LessonCompletionToggle } from "@/components/lesson-completion";
 import { CourseProgress } from "@/components/course-progress";
+import { HLSVideoPlayer } from "@/components/HLSVideoPlayer";
 
-// Enhanced Video Player Component - Direct YouTube Embed
+// Enhanced Video Player Component - Supports both YouTube and HLS
 const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }: { 
   video: any; 
   onVideoChange: (index: number) => void; 
@@ -40,30 +41,42 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
     setError('Failed to load video player');
   };
 
-  // Generate direct YouTube embed URL
-  const getEmbeddedPlayerUrl = () => {
+  // Determine video type and URL
+  const getVideoInfo = () => {
     const urlToUse = video.currentUrl || video.url;
-    console.log('EnhancedVideoPlayer - URL to use:', urlToUse, 'video.currentUrl:', video.currentUrl, 'video.url:', video.url);
     
     if (!urlToUse) {
-      console.error('No URL available for video player');
-      return null;
+      return { type: 'none', url: null };
     }
     
+    // Check if it's a YouTube video
     if (isYouTubeVideo(urlToUse)) {
       const videoId = urlToUse.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)?.[1];
       const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&rel=0&modestbranding=1`;
-      console.log('YouTube video detected, embed URL:', embedUrl);
-      return embedUrl;
+      return { type: 'youtube', url: embedUrl };
     }
-    console.log('Non-YouTube video, using URL as-is:', urlToUse);
-    return urlToUse;
+    
+    // Check if it's an HLS video
+    if (urlToUse.includes('.m3u8')) {
+      // Distinguish between S3 and external HLS
+      if (urlToUse.includes('.s3.') || urlToUse.includes('.amazonaws.com')) {
+        // S3 HLS - use iframe (served through backend)
+        return { type: 's3-hls', url: urlToUse };
+      } else {
+        // External HLS - use HLS player
+        console.log('HLS External video - using URL as-is:', urlToUse);
+        return { type: 'hls-external', url: urlToUse };
+      }
+    }
+    
+    // Other video types
+    return { type: 'other', url: urlToUse };
   };
 
-  const embeddedUrl = getEmbeddedPlayerUrl();
+  const videoInfo = getVideoInfo();
 
   // No URL available
-  if (!embeddedUrl) {
+  if (videoInfo.type === 'none' || !videoInfo.url) {
     return (
       <div className="relative bg-black rounded-xl overflow-hidden shadow-2xl min-h-[400px] flex items-center justify-center">
         <div className="text-center text-white p-8">
@@ -111,6 +124,23 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
     );
   }
 
+  // Render HLS player for external HLS videos
+  if (videoInfo.type === 'hls-external') {
+    return (
+      <div className="relative bg-black rounded-xl overflow-hidden shadow-2xl">
+        <div className="relative w-full h-full min-h-[500px]">
+          <HLSVideoPlayer
+            videoUrl={videoInfo.url}
+            controls={true}
+            autoplay={false}
+            className="w-full h-full min-h-[500px] rounded-xl"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Render iframe for S3 HLS and YouTube videos
   return (
     <div className="relative bg-black rounded-xl overflow-hidden shadow-2xl">
       {/* Loading Overlay */}
@@ -118,7 +148,9 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
           <div className="text-center text-white">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mb-4"></div>
-            <p className="text-lg">Loading YouTube video...</p>
+            <p className="text-lg">
+              Loading {videoInfo.type === 'youtube' ? 'YouTube' : videoInfo.type === 's3-hls' ? 'S3' : ''} video...
+            </p>
           </div>
         </div>
       )}
@@ -126,7 +158,7 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
       {/* Embedded Video Player */}
       <div className="relative w-full h-full min-h-[500px]">
           <iframe
-            src={embeddedUrl}
+            src={videoInfo.url}
             width="100%"
             height="100%"
             frameBorder="0"
@@ -134,7 +166,7 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
             onLoad={handleIframeLoad}
             onError={handleIframeError}
             className="w-full h-full min-h-[500px] rounded-xl"
-            title={video.title || 'YouTube Video'}
+            title={video.title || 'Video Player'}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           />
       </div>
@@ -146,12 +178,17 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
             <div>
               <h3 className="font-semibold text-lg">{video.title}</h3>
               <p className="text-sm text-gray-300 opacity-90">
-                YouTube Video Player
+                {videoInfo.type === 'youtube' ? 'YouTube Video Player' : 
+                 videoInfo.type === 's3-hls' ? 'S3 Video Player' : 'Video Player'}
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                YouTube
+              <div className={`text-white text-xs px-2 py-1 rounded-full font-medium ${
+                videoInfo.type === 'youtube' ? 'bg-red-500' : 
+                videoInfo.type === 's3-hls' ? 'bg-orange-500' : 'bg-gray-500'
+              }`}>
+                {videoInfo.type === 'youtube' ? 'YouTube' : 
+                 videoInfo.type === 's3-hls' ? 'S3' : 'Video'}
               </div>
               <div className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium">
                 {currentIndex + 1}/{totalVideos}
@@ -174,40 +211,40 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
         </button>
       </div>
 
-              <div className="absolute top-1/2 right-4 transform -translate-y-1/2 z-20">
-          <button
-            onClick={() => onVideoChange(Math.min(totalVideos - 1, currentIndex + 1))}
-            disabled={currentIndex === totalVideos - 1}
-            className="bg-black bg-opacity-60 hover:bg-opacity-80 backdrop-blur-sm rounded-full p-3 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+      <div className="absolute top-1/2 right-4 transform -translate-y-1/2 z-20">
+        <button
+          onClick={() => onVideoChange(Math.min(totalVideos - 1, currentIndex + 1))}
+          disabled={currentIndex === totalVideos - 1}
+          className="bg-black bg-opacity-60 hover:bg-opacity-80 backdrop-blur-sm rounded-full p-3 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
 
-             {/* Fullscreen Button */}
-       <div className="absolute bottom-4 right-4 z-20">
-         <button
-           onClick={() => {
-             const iframe = document.querySelector('iframe') as any;
-             if (iframe) {
-               if (iframe.requestFullscreen) {
-                 iframe.requestFullscreen();
-               } else if (iframe.webkitRequestFullscreen) {
-                 iframe.webkitRequestFullscreen();
-               } else if (iframe.mozRequestFullScreen) {
-                 iframe.mozRequestFullScreen();
-               }
-             }
-           }}
-           className="bg-black bg-opacity-60 hover:bg-opacity-80 backdrop-blur-sm rounded-full p-3 text-white transition-all duration-300"
-         >
-           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-           </svg>
-         </button>
-       </div>
+      {/* Fullscreen Button */}
+      <div className="absolute bottom-4 right-4 z-20">
+        <button
+          onClick={() => {
+            const iframe = document.querySelector('iframe') as any;
+            if (iframe) {
+              if (iframe.requestFullscreen) {
+                iframe.requestFullscreen();
+              } else if (iframe.webkitRequestFullscreen) {
+                iframe.webkitRequestFullscreen();
+              } else if (iframe.mozRequestFullScreen) {
+                iframe.mozRequestFullScreen();
+              }
+            }
+          }}
+          className="bg-black bg-opacity-60 hover:bg-opacity-80 backdrop-blur-sm rounded-full p-3 text-white transition-all duration-300"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 };
@@ -223,27 +260,15 @@ export default function CourseVideosPage() {
   // Trim courseSlug to handle any trailing spaces that might cause URL encoding issues
   const courseIdentifier = courseSlug?.trim();
 
-  // Debug: Log when component loads
-  console.log('===== CourseVideosPage Loaded =====');
-  console.log('courseSlug from URL:', courseSlug);
-  console.log('courseIdentifier (trimmed):', courseIdentifier);
-  console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-  console.log('VITE_BACKEND_URL:', import.meta.env.VITE_BACKEND_URL);
-
   // All hooks must be called at the top level before any conditional returns
   const { data: course, isLoading } = useQuery({
     queryKey: [`/api/courses/${courseIdentifier}`, 'slug'],
     queryFn: async () => {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
-      console.log('🔥 QUERY FUNCTION EXECUTING!');
-      console.log('API_BASE_URL:', API_BASE_URL);
-      console.log('Fetching course:', `${API_BASE_URL}/api/courses/${courseIdentifier}`);
       
       if (!API_BASE_URL) throw new Error('API base URL not configured');
       const res = await fetch(`${API_BASE_URL}/api/courses/${courseIdentifier}`);
-      console.log('Response status:', res.status);
       const data = await res.json();
-      console.log('Response data:', data);
       
       // Handle case where API returns an array instead of single object
       let courseData;
@@ -261,11 +286,6 @@ export default function CourseVideosPage() {
     enabled: !!courseIdentifier,
   });
 
-  // Debug: Log query state
-  console.log('Query enabled:', !!courseIdentifier);
-  console.log('Query isLoading:', isLoading);
-  console.log('Query data (course):', course);
-
   // Fetch lessons for this course
   const { data: lessons, isLoading: isLessonsLoading } = useQuery({
     queryKey: [`lessons`, course?._id],
@@ -276,16 +296,13 @@ export default function CourseVideosPage() {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
       if (!API_BASE_URL) throw new Error('API base URL not configured');
       
-      console.log('🎓 Fetching lessons for course:', courseId);
       const res = await fetch(`${API_BASE_URL}/api/courses/${courseId}/lessons`, {
         credentials: "include",
       });
       if (!res.ok) {
-        console.warn('Lessons API failed:', res.status);
         return [];
       }
       const data = await res.json();
-      console.log('✅ Lessons fetched:', data);
       return Array.isArray(data) ? data : [];
     },
     enabled: !!course?._id,
@@ -300,13 +317,11 @@ export default function CourseVideosPage() {
       try {
         const res = await fetch(`${API_BASE_URL}/api/courses/${courseIdentifier}/reviews`);
         if (!res.ok) {
-          console.warn('Reviews API failed:', res.status);
           return [];
         }
         const data = await res.json();
         return Array.isArray(data) ? data : [];
       } catch (error) {
-        console.error('Error fetching reviews:', error);
         return [];
       }
     },
@@ -350,7 +365,6 @@ export default function CourseVideosPage() {
         credentials: "include",
       });
       if (!res.ok) {
-        console.warn('Comments API failed:', res.status);
         return [];
       }
       const data = await res.json();
@@ -372,32 +386,8 @@ export default function CourseVideosPage() {
     type: lesson.video?.videoType || 'youtube',
   })) || course?.videoLinks || [];
   
-  // Debug: Log videoLinks to verify each has unique lessonId
-  console.log('🔍 VideoLinks built:', videoLinks.map((v: any, i: number) => ({
-    index: i,
-    title: v.title,
-    lessonId: v.lessonId
-  })));
-  
   const currentVideo = videoLinks[currentVideoIndex];
 
-  // Debug: Log course, lessons and videoLinks when they change
-  useEffect(() => {
-    if (course) {
-      console.log('📚 Course loaded:', course);
-      console.log('📖 Lessons from API:', lessons);
-      console.log('🎥 Video links (built):', videoLinks);
-      console.log('📊 Total videos:', videoLinks.length);
-      console.log('📈 Lesson count from course:', course.lessonCount);
-      console.log('🔢 Actual lessons fetched:', lessons?.length || 0);
-      
-      // If videoLinks is empty but lessons were fetched
-      if (videoLinks.length === 0 && lessons && lessons.length > 0) {
-        console.warn('⚠️ Lessons exist but videoLinks is empty!');
-        console.log('Lessons detail:', lessons);
-      }
-    }
-  }, [course?._id, lessons, videoLinks.length]);
 
   // Function to fetch video URL when lesson is clicked
   const fetchVideoUrl = async (lessonId: string) => {
@@ -406,8 +396,6 @@ export default function CourseVideosPage() {
       if (!API_BASE_URL) throw new Error('API base URL not configured');
       
       const apiUrl = `${API_BASE_URL}/api/courses/${courseIdentifier}/${lessonId}`;
-      console.log('🎬 Fetching video URL for lesson:', lessonId);
-      console.log('📡 API URL:', apiUrl);
       
       const res = await fetch(apiUrl, {
         credentials: "include",
@@ -415,22 +403,17 @@ export default function CourseVideosPage() {
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
-        console.error('❌ Failed to fetch video URL, status:', res.status, 'error:', errorData);
         throw new Error(errorData.message || 'Failed to fetch video URL');
       }
       
       const data = await res.json();
-      console.log('✅ Video URL response:', data);
-      console.log('🎥 Playback URL:', data.url);
       
       if (!data.url) {
-        console.warn('⚠️ No playback URL in response');
         return null;
       }
       
       return data.url;
     } catch (error) {
-      console.error('❌ Error fetching video URL:', error);
       toast({ 
         title: "Error", 
         description: error instanceof Error ? error.message : "Failed to load video URL", 
@@ -442,31 +425,20 @@ export default function CourseVideosPage() {
 
   // Handle lesson click - fetch and play video
   const handleLessonClick = async (index: number) => {
-    console.log('👆 User clicked lesson at index:', index);
     setCurrentVideoIndex(index);
     const lesson = videoLinks[index];
     
-    console.log('📝 Lesson details:', {
-      title: lesson?.title,
-      lessonId: lesson?.lessonId,
-      hasPreloadedUrl: !!lesson?.url
-    });
-    
     // Always fetch the video URL from API to get the latest/actual playback URL
     if (lesson?.lessonId) {
-      console.log('🔄 Fetching fresh video URL from API...');
       const videoUrl = await fetchVideoUrl(lesson.lessonId);
       if (videoUrl) {
-        console.log('✅ Successfully fetched video URL, now playing:', videoUrl);
         setCurrentVideoUrl(videoUrl);
       } else {
         // Fallback to the embedded URL if API call fails
-        console.warn('⚠️ API call failed, falling back to preloaded URL:', lesson.url);
         setCurrentVideoUrl(lesson.url || null);
       }
     } else {
       // Fallback to the embedded URL if no lessonId
-      console.warn('⚠️ No lessonId available, using preloaded URL:', lesson.url);
       setCurrentVideoUrl(lesson.url || null);
     }
   };
@@ -475,21 +447,17 @@ export default function CourseVideosPage() {
   useEffect(() => {
     if (course && videoLinks.length > 0) {
       const firstLesson = videoLinks[0];
-      console.log('Loading first video:', firstLesson);
       
       if (firstLesson?.lessonId) {
         fetchVideoUrl(firstLesson.lessonId).then(url => {
           if (url) {
-            console.log('First video URL loaded:', url);
             setCurrentVideoUrl(url);
           } else {
             // Fallback to original URL
-            console.log('API failed, using original URL for first video:', firstLesson.url);
             setCurrentVideoUrl(firstLesson.url);
           }
         });
       } else if (firstLesson?.url) {
-        console.log('Using original URL for first video:', firstLesson.url);
         setCurrentVideoUrl(firstLesson.url);
       }
     }
@@ -557,7 +525,6 @@ export default function CourseVideosPage() {
       toast({ title: "Thank you!", description: "Your rating has been submitted." });
     },
     onError: (err: any) => {
-      console.error('Review submission error:', err);
       toast({ title: "Error", description: err?.message || "Failed to submit rating", variant: "destructive" });
     },
   });
@@ -798,7 +765,6 @@ export default function CourseVideosPage() {
                         : 'hover:bg-muted/50 border-transparent'
                     }`}
                     onClick={() => {
-                      console.log('📌 Clicked video at index:', idx, 'Title:', video.title, 'LessonId:', video.lessonId);
                       handleLessonClick(idx);
                     }}
                   >
@@ -820,11 +786,11 @@ export default function CourseVideosPage() {
         </div>
         
         {/* Clear separation from video content */}
-        <div className="w-full h-4 bg-background"></div>
+        <div className="w-full h-24 bg-background"></div>
         
         {/* Rating Section */}
-        <div className="w-full bg-background border-t relative z-10" style={{ isolation: 'isolate' }}>
-          <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="w-full bg-background border-t relative z-10 mt-16" style={{ isolation: 'isolate' }}>
+          <div className="max-w-4xl mx-auto px-6 py-12">
             <div className="text-center mb-6 relative z-20">
               <h3 className="text-xl font-bold mb-2">Course Rating</h3>
                 
