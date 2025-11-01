@@ -5,12 +5,15 @@ node_modules/
 
 # Environment files
 .env
+.env.clean
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 */.env
+*/.env.clean
 **/.env
+**/.env.clean
 
 # Build outputs
 dist/
