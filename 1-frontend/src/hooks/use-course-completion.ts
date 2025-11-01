@@ -22,7 +22,7 @@ export const useCourseCompletion = (courseId: string) => {
   const { data: completionStatus, refetch: refetchCompletion } = useQuery({
     queryKey: [`/api/courses/${courseId}/completion`],
     queryFn: async () => {
-      const response = await apiGet(`/courses/${courseId}/completion`);
+      const response = await apiGet(`/api/courses/${courseId}/completion`);
       if (!response.ok) {
         throw new Error('Failed to fetch completion status');
       }
@@ -34,7 +34,7 @@ export const useCourseCompletion = (courseId: string) => {
   // Mark lesson as completed
   const markLessonCompleted = useMutation({
     mutationFn: async (lessonId: string) => {
-      const response = await apiPost(`/courses/${courseId}/lessons/${lessonId}/complete`);
+      const response = await apiPost(`/api/courses/${courseId}/lessons/${lessonId}/complete`);
       if (!response.ok) {
         throw new Error('Failed to mark lesson as completed');
       }
@@ -65,7 +65,7 @@ export const useCourseCompletion = (courseId: string) => {
   // Mark lesson as incomplete
   const markLessonIncomplete = useMutation({
     mutationFn: async (lessonId: string) => {
-      const response = await apiDelete(`/courses/${courseId}/lessons/${lessonId}/complete`);
+      const response = await apiDelete(`/api/courses/${courseId}/lessons/${lessonId}/complete`);
       if (!response.ok) {
         throw new Error('Failed to mark lesson as incomplete');
       }
@@ -96,7 +96,7 @@ export const useCourseCompletion = (courseId: string) => {
   // Complete course
   const completeCourse = useMutation({
     mutationFn: async () => {
-      const response = await apiPost(`/courses/${courseId}/complete`);
+      const response = await apiPost(`/api/courses/${courseId}/complete`);
       if (!response.ok) {
         throw new Error('Failed to complete course');
       }

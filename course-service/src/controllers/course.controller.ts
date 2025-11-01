@@ -1,11 +1,24 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import Course from '../models/Course';
+import Course, { ICourse } from '../models/Course';
 import Enrollment from '../models/Enrollment';
 import Lesson from '../models/Lesson';
 import { logger } from '../utils/logger';
 import axios from 'axios';
 import config from '../config/config';
+
+const getPreferredPlaybackUrl = (video: any): string | null => {
+  if (!video) return null;
+
+  return (
+    video.externalHlsUrl ||
+    video.hls1080Url ||
+    video.hls720Url ||
+    video.youtubeUrl ||
+    video.originalUrl ||
+    null
+  );
+};
 
 // Get all courses
 export const getAllCourses = async (req: Request, res: Response): Promise<void> => {
@@ -36,9 +49,15 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
       course = await Course.findById(id);
     }
     
-    // If not found by ID, try by slug
+    // If not found by ID, try by slug (with and without trimming for flexibility)
     if (!course) {
-      course = await Course.findOne({ slug: id });
+      const trimmedId = id?.trim();
+      course = await Course.findOne({ 
+        $or: [
+          { slug: trimmedId },
+          { slug: id }
+        ]
+      });
     }
     
     if (!course) {
@@ -46,7 +65,104 @@ export const getCourse = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     
-    res.status(200).json(course);
+    const courseDoc = course.toObject() as ICourse & { lessons?: any[] };
+    const courseId = course._id as mongoose.Types.ObjectId;
+
+    logger.info('Fetching lessons for course', { courseId: courseId.toString(), slug: course.slug });
+
+    try {
+      const lessons = await Lesson.find({ courseId })
+        .sort({ order: 1 })
+        .lean();
+
+      logger.info('Lessons fetched for course', { courseId, lessonCount: lessons.length });
+
+      const videoDetailsMap = new Map<string, any>();
+
+      await Promise.all(
+        lessons
+          .filter((lesson) => lesson.videoId)
+          .map(async (lesson) => {
+            const videoId = String(lesson.videoId);
+            if (videoDetailsMap.has(videoId)) return;
+
+            try {
+            logger.info('Fetching video details for lesson', { courseId, lessonId: lesson._id, videoId });
+            const response = await axios.get(`${config.UPLOADER_SERVICE_URL}/api/videos/${videoId}`);
+              videoDetailsMap.set(videoId, response.data);
+            } catch (videoError) {
+              logger.error('Error fetching video details for lesson', {
+              courseId,
+                lessonId: lesson._id,
+                videoId,
+                error: (videoError as Error).message,
+              });
+            }
+          })
+      );
+
+      const lessonsWithVideo = lessons.map((lesson) => {
+        const videoId = lesson.videoId ? String(lesson.videoId) : undefined;
+        const videoDetails = videoId ? videoDetailsMap.get(videoId) : null;
+        const playbackUrl = getPreferredPlaybackUrl(videoDetails);
+
+        if (videoDetails) {
+          logger.info('Resolved video details for lesson', {
+            courseId,
+            lessonId: lesson._id,
+            videoId,
+            playbackUrl,
+          });
+        } else {
+          logger.warn('Missing video details for lesson', {
+            courseId,
+            lessonId: lesson._id,
+            videoId,
+          });
+        }
+
+        return {
+          _id: lesson._id.toString(),
+          title: lesson.title,
+          description: lesson.description,
+          content: lesson.content,
+          order: lesson.order,
+          videoId,
+          playbackUrl,
+          video: videoDetails,
+          createdAt: lesson.createdAt,
+          updatedAt: lesson.updatedAt,
+        };
+      });
+
+      courseDoc.lessons = lessonsWithVideo;
+
+      // Backwards compatibility for existing clients expecting `videoLinks`
+      courseDoc.videoLinks = lessonsWithVideo
+        .filter((lesson) => lesson.playbackUrl)
+        .map((lesson) => ({
+          title: lesson.title,
+          url: lesson.playbackUrl!,
+          lessonId: lesson._id,
+          order: lesson.order,
+          videoId: lesson.videoId,
+          type: lesson.video?.videoType === 'youtube'
+            ? 'youtube'
+            : lesson.video?.videoType === 'external-hls'
+              ? 'external'
+              : 'uploaded',
+        }));
+
+      logger.info('Course response constructed with lessons', {
+        courseId,
+        lessonCount: lessonsWithVideo.length,
+        videoLinkCount: courseDoc.videoLinks?.length ?? 0,
+      });
+    } catch (lessonsError) {
+      logger.error('Error enriching course with lessons:', lessonsError);
+    }
+
+    res.status(200).json(courseDoc);
   } catch (error) {
     logger.error('Error fetching course:', error);
     res.status(500).json({ message: 'Error fetching course' });
@@ -179,8 +295,14 @@ export const getEnrollmentStatusBySlug = async (req: Request, res: Response): Pr
       return;
     }
     
-    // Find course by slug
-    const course = await Course.findOne({ slug });
+    // Find course by slug (trim to handle trailing spaces)
+    const trimmedSlug = slug?.trim();
+    const course = await Course.findOne({ 
+      $or: [
+        { slug: trimmedSlug },
+        { slug: slug }
+      ]
+    });
     if (!course) {
       res.status(404).json({ message: 'Course not found' });
       return;
@@ -210,6 +332,48 @@ export const getUserEnrollments = async (req: Request, res: Response): Promise<v
   } catch (error) {
     logger.error('Error fetching user enrollments:', error);
     res.status(500).json({ message: 'Error fetching user enrollments' });
+  }
+};
+
+// Get completion status
+export const getCompletionStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { courseId } = req.params;
+    const { userId } = req.query;
+    
+    if (!userId) {
+      res.status(401).json({ message: 'User ID is required' });
+      return;
+    }
+    
+    const course = await Course.findById(courseId);
+    if (!course) {
+      res.status(404).json({ message: 'Course not found' });
+      return;
+    }
+    
+    const enrollment = await Enrollment.findOne({ userId, courseId });
+    if (!enrollment) {
+      res.status(200).json({
+        progress: 0,
+        isCompleted: false,
+        completedLessons: [],
+        totalLessons: course.lessonCount || 0,
+        completedCount: 0
+      });
+      return;
+    }
+    
+    res.status(200).json({
+      progress: enrollment.progress || 0,
+      isCompleted: enrollment.isCompleted || false,
+      completedLessons: enrollment.completedLessons || [],
+      totalLessons: course.lessonCount || 0,
+      completedCount: enrollment.completedLessons?.length || 0
+    });
+  } catch (error) {
+    logger.error('Error fetching completion status:', error);
+    res.status(500).json({ message: 'Error fetching completion status' });
   }
 };
 
@@ -452,7 +616,8 @@ export const getLessonsByCourse = async (req: Request, res: Response): Promise<v
       return;
     }
     
-    const lessons = await Lesson.find({ courseId }).sort({ order: 1 });
+    const courseObjectId = new mongoose.Types.ObjectId(courseId);
+    const lessons = await Lesson.find({ courseId: courseObjectId }).sort({ order: 1 });
     res.status(200).json(lessons);
   } catch (error) {
     logger.error('Error fetching lessons:', error);
@@ -480,6 +645,137 @@ export const getLessonById = async (req: Request, res: Response): Promise<void> 
   } catch (error) {
     logger.error('Error fetching lesson:', error);
     res.status(500).json({ message: 'Error fetching lesson' });
+  }
+};
+
+export const getLessonBySlugAndId = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { slug, lessonId } = req.params;
+
+    if (!slug || !lessonId) {
+      res.status(400).json({ message: 'Slug and lesson ID are required' });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(lessonId)) {
+      res.status(400).json({ message: 'Invalid lesson ID' });
+      return;
+    }
+
+    const course = await Course.findOne({ slug });
+    if (!course) {
+      res.status(404).json({ message: 'Course not found' });
+      return;
+    }
+
+    logger.info('Fetching lesson by slug and ID', { slug, lessonId });
+
+    const courseId = course._id as mongoose.Types.ObjectId;
+    const lesson = await Lesson.findOne({ _id: lessonId, courseId }).lean();
+    if (!lesson) {
+      res.status(404).json({ message: 'Lesson not found for this course' });
+      return;
+    }
+
+    let videoDetails: any = null;
+    let playbackUrl: string | null = null;
+
+    if (lesson.videoId) {
+      try {
+        logger.info('Fetching video details for lesson via slug request', { slug, lessonId, videoId: lesson.videoId });
+        const response = await axios.get(`${config.UPLOADER_SERVICE_URL}/api/videos/${lesson.videoId}`);
+        videoDetails = response.data;
+        playbackUrl = getPreferredPlaybackUrl(videoDetails);
+      } catch (videoError) {
+        logger.error('Error fetching video details for lesson by slug', {
+          slug,
+          lessonId,
+          videoId: lesson.videoId,
+          error: (videoError as Error).message,
+        });
+      }
+    }
+
+    res.status(200).json({
+      lesson: {
+        _id: lesson._id.toString(),
+        courseId,
+        title: lesson.title,
+        description: lesson.description,
+        content: lesson.content,
+        order: lesson.order,
+        videoId: lesson.videoId ? String(lesson.videoId) : undefined,
+        createdAt: lesson.createdAt,
+        updatedAt: lesson.updatedAt,
+      },
+      video: videoDetails,
+      playbackUrl,
+    });
+  } catch (error) {
+    logger.error('Error fetching lesson by slug and ID:', error);
+    res.status(500).json({ message: 'Error fetching lesson' });
+  }
+};
+
+// Get video playback URL by course slug and lesson ID (simplified endpoint)
+export const getVideoPlaybackUrl = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { slug, lessonId } = req.params;
+
+    if (!slug || !lessonId) {
+      res.status(400).json({ message: 'Slug and lesson ID are required' });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(lessonId)) {
+      res.status(400).json({ message: 'Invalid lesson ID' });
+      return;
+    }
+
+    const course = await Course.findOne({ slug });
+    if (!course) {
+      res.status(404).json({ message: 'Course not found' });
+      return;
+    }
+
+    logger.info('Fetching video playback URL', { slug, lessonId });
+
+    const courseId = course._id as mongoose.Types.ObjectId;
+    const lesson = await Lesson.findOne({ _id: lessonId, courseId }).lean();
+    if (!lesson) {
+      res.status(404).json({ message: 'Lesson not found for this course' });
+      return;
+    }
+
+    let videoDetails: any = null;
+    let playbackUrl: string | null = null;
+
+    if (lesson.videoId) {
+      try {
+        logger.info('Fetching video details for playback URL', { slug, lessonId, videoId: lesson.videoId });
+        const response = await axios.get(`${config.UPLOADER_SERVICE_URL}/api/videos/${lesson.videoId}`);
+        videoDetails = response.data;
+        playbackUrl = getPreferredPlaybackUrl(videoDetails);
+      } catch (videoError) {
+        logger.error('Error fetching video details for playback', {
+          slug,
+          lessonId,
+          videoId: lesson.videoId,
+          error: (videoError as Error).message,
+        });
+      }
+    }
+
+    // Return simplified response with just the playback URL
+    res.status(200).json({
+      url: playbackUrl,
+      title: lesson.title,
+      lessonId: lesson._id.toString(),
+      videoId: lesson.videoId ? String(lesson.videoId) : undefined,
+    });
+  } catch (error) {
+    logger.error('Error fetching video playback URL:', error);
+    res.status(500).json({ message: 'Error fetching video playback URL' });
   }
 };
 
@@ -588,3 +884,4 @@ export const deleteLesson = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({ message: 'Error deleting lesson' });
   }
 };
+

@@ -91,7 +91,12 @@ export default function AdminDashboard() {
       const totalLessons = courses.reduce((sum: number, course: any) => sum + (course.lessonCount || 0), 0);
 
       // Generate recent activity from real data
-      const recentActivity = [];
+      const recentActivity: Array<{
+        id: string;
+        type: 'video_upload' | 'user_signup';
+        message: string;
+        timestamp: string;
+      }> = [];
       
       // Add recent video uploads
       const recentVideos = videos.slice(0, 3);
@@ -119,15 +124,19 @@ export default function AdminDashboard() {
       recentActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       // Check system health
-      const systemHealth = {
-        status: 'healthy' as const,
+      const systemHealth: {
+        status: 'healthy' | 'warning' | 'error';
+        message: string;
+        services: Array<{ name: string; status: 'up' | 'down'; responseTime: number }>;
+      } = {
+        status: 'healthy',
         message: 'All systems operational',
         services: [
-          { name: 'Auth Service', status: usersRes.status === 'fulfilled' ? 'up' as const : 'down' as const, responseTime: 45 },
-          { name: 'Course Service', status: coursesRes.status === 'fulfilled' ? 'up' as const : 'down' as const, responseTime: 32 },
-          { name: 'Uploader Service', status: videosRes.status === 'fulfilled' ? 'up' as const : 'down' as const, responseTime: 28 },
-          { name: 'Admin Service', status: systemStatsRes.status === 'fulfilled' ? 'up' as const : 'down' as const, responseTime: 67 },
-          { name: 'API Gateway', status: 'up' as const, responseTime: 12 },
+          { name: 'Auth Service', status: usersRes.status === 'fulfilled' ? 'up' : 'down', responseTime: 45 },
+          { name: 'Course Service', status: coursesRes.status === 'fulfilled' ? 'up' : 'down', responseTime: 32 },
+          { name: 'Uploader Service', status: videosRes.status === 'fulfilled' ? 'up' : 'down', responseTime: 28 },
+          { name: 'Admin Service', status: systemStatsRes.status === 'fulfilled' ? 'up' : 'down', responseTime: 67 },
+          { name: 'API Gateway', status: 'up', responseTime: 12 },
         ],
       };
 

@@ -124,6 +124,7 @@ app.use('/api/auth', createProxyMiddleware({
 app.use('/api/courses', async (req: Request, res: Response) => {
   try {
     logger.info(`[COURSES] Direct call: ${req.method} ${req.path}`);
+    logger.info(`[COURSES] Full URL: ${req.url}`);
     
     let targetUrl = `${config.COURSE_SERVICE_URL}/api/courses`;
     
@@ -134,16 +135,21 @@ app.use('/api/courses', async (req: Request, res: Response) => {
     }
     
     // Handle specific course routes with path parameters
-    if (req.path.includes('/slug/')) {
-      const slug = req.path.split('/slug/')[1];
-      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses/slug/${slug}`;
+    // Check for slug-based enrollment/lesson routes
+    if (req.path.match(/^\/slug\/[^\/]+\/(enrollment|enroll)/)) {
+      // Handle slug-based enrollment and lesson routes first
+      // e.g., /slug/amber-lms-test/enrollment or /slug/amber-lms-test/lessons/123
+      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
       if (req.url.includes('?')) {
         const queryString = req.url.split('?')[1];
         targetUrl += `?${queryString}`;
       }
-    } else if (req.path.match(/\/slug\/[^\/]+\/(enrollment|enroll)/)) {
-      // Handle slug-based enrollment routes
-      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
+      logger.info(`[COURSES] Matched slug enrollment route, targeting: ${targetUrl}`);
+    } else if (req.path.includes('/slug/')) {
+      // Handle simple slug routes
+      // e.g., /slug/amber-lms-test
+      const slug = req.path.split('/slug/')[1];
+      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses/slug/${slug}`;
       if (req.url.includes('?')) {
         const queryString = req.url.split('?')[1];
         targetUrl += `?${queryString}`;
@@ -165,7 +171,18 @@ app.use('/api/courses', async (req: Request, res: Response) => {
     } else if ((req.method === 'PUT' || req.method === 'DELETE') && req.path.match(/^\/[a-f0-9]{24}$/)) {
       // Handle PUT/DELETE requests with MongoDB ObjectId (24 hex characters)
       targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
+    } else if (req.path && req.path !== '/') {
+      // Catch-all: forward any other path-based requests
+      // This handles routes like /:slug/:lessonId for video playback
+      targetUrl = `${config.COURSE_SERVICE_URL}/api/courses${req.path}`;
+      if (req.url.includes('?')) {
+        const queryString = req.url.split('?')[1];
+        targetUrl += `?${queryString}`;
+      }
+      logger.info(`[COURSES] Catch-all route, including path: ${req.path}`);
     }
+    
+    logger.info(`[COURSES] Final target URL: ${targetUrl}`);
     
     const response = await axios({
       method: req.method as any,
@@ -178,9 +195,11 @@ app.use('/api/courses', async (req: Request, res: Response) => {
       timeout: 10000
     });
     
+    logger.info(`[COURSES] Response status: ${response.status}`);
     res.status(response.status).json(response.data);
   } catch (error: any) {
     logger.error(`[COURSES] Direct call error: ${error.message}`);
+    logger.error(`[COURSES] Error details: ${JSON.stringify(error.response?.data)}`);
     res.status(error.response?.status || 500).json(
       error.response?.data || { message: 'Course service unavailable' }
     );

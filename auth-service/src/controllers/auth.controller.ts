@@ -4,9 +4,14 @@ import LoginAttempt from '../models/LoginAttempt';
 import { hashPassword, comparePasswords } from '../utils/password';
 import { generateUniqueUsername } from '../utils/username-generator';
 import { logger } from '../utils/logger';
-import jwt from 'jsonwebtoken';
+import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import config from '../config/config';
 import axios from 'axios';
+
+const jwtSecret: Secret = config.JWT_SECRET;
+const defaultSignOptions: SignOptions = {
+  expiresIn: config.JWT_EXPIRY as SignOptions['expiresIn'],
+};
 
 // Register a new user
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -38,15 +43,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
-        id: user._id, 
-        username: user.username, 
+      {
+        id: user._id,
+        username: user.username,
         email: user.email,
         role: user.role,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin,
       },
-      config.JWT_SECRET,
-      { expiresIn: config.JWT_EXPIRY }
+      jwtSecret,
+      defaultSignOptions,
     );
 
     // Format user response
@@ -96,15 +101,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
-        id: user._id, 
-        username: user.username, 
+      {
+        id: user._id,
+        username: user.username,
         email: user.email,
         role: user.role,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin,
       },
-      config.JWT_SECRET,
-      { expiresIn: config.JWT_EXPIRY }
+      jwtSecret,
+      defaultSignOptions,
     );
 
     // Format user response
@@ -219,8 +224,8 @@ export const adminLoginWithGoogle = async (req: Request, res: Response): Promise
     // Generate JWT token
     const token = jwt.sign(
       { id: user._id, isAdmin: user.isAdmin },
-      config.JWT_SECRET,
-      { expiresIn: config.JWT_EXPIRY }
+      jwtSecret,
+      defaultSignOptions,
     );
 
     res.json({

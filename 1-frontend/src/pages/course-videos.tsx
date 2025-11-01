@@ -42,14 +42,38 @@ const EnhancedVideoPlayer = ({ video, onVideoChange, currentIndex, totalVideos }
 
   // Generate direct YouTube embed URL
   const getEmbeddedPlayerUrl = () => {
-    if (isYouTubeVideo(video.url)) {
-      const videoId = video.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)?.[1];
-      return `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&rel=0&modestbranding=1`;
+    const urlToUse = video.currentUrl || video.url;
+    console.log('EnhancedVideoPlayer - URL to use:', urlToUse, 'video.currentUrl:', video.currentUrl, 'video.url:', video.url);
+    
+    if (!urlToUse) {
+      console.error('No URL available for video player');
+      return null;
     }
-    return video.url;
+    
+    if (isYouTubeVideo(urlToUse)) {
+      const videoId = urlToUse.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)?.[1];
+      const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&rel=0&modestbranding=1`;
+      console.log('YouTube video detected, embed URL:', embedUrl);
+      return embedUrl;
+    }
+    console.log('Non-YouTube video, using URL as-is:', urlToUse);
+    return urlToUse;
   };
 
   const embeddedUrl = getEmbeddedPlayerUrl();
+
+  // No URL available
+  if (!embeddedUrl) {
+    return (
+      <div className="relative bg-black rounded-xl overflow-hidden shadow-2xl min-h-[400px] flex items-center justify-center">
+        <div className="text-center text-white p-8">
+          <div className="text-6xl mb-4">📹</div>
+          <h3 className="text-xl font-semibold mb-2">No Video Available</h3>
+          <p className="text-gray-300 mb-6 max-w-md">This lesson doesn't have a video URL configured yet.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Error state
   if (error) {
@@ -194,20 +218,77 @@ export default function CourseVideosPage() {
   const { toast } = useToast();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
 
   // Trim courseSlug to handle any trailing spaces that might cause URL encoding issues
   const courseIdentifier = courseSlug?.trim();
+
+  // Debug: Log when component loads
+  console.log('===== CourseVideosPage Loaded =====');
+  console.log('courseSlug from URL:', courseSlug);
+  console.log('courseIdentifier (trimmed):', courseIdentifier);
+  console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+  console.log('VITE_BACKEND_URL:', import.meta.env.VITE_BACKEND_URL);
 
   // All hooks must be called at the top level before any conditional returns
   const { data: course, isLoading } = useQuery({
     queryKey: [`/api/courses/${courseIdentifier}`, 'slug'],
     queryFn: async () => {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+      console.log('🔥 QUERY FUNCTION EXECUTING!');
+      console.log('API_BASE_URL:', API_BASE_URL);
+      console.log('Fetching course:', `${API_BASE_URL}/api/courses/${courseIdentifier}`);
+      
       if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}/api/courses/slug/${courseIdentifier}`);
-      return res.json();
+      const res = await fetch(`${API_BASE_URL}/api/courses/${courseIdentifier}`);
+      console.log('Response status:', res.status);
+      const data = await res.json();
+      console.log('Response data:', data);
+      
+      // Handle case where API returns an array instead of single object
+      let courseData;
+      if (Array.isArray(data)) {
+        if (data.length === 0) {
+          throw new Error('Course not found');
+        }
+        courseData = data[0]; // Return first course from array
+      } else {
+        courseData = data;
+      }
+      
+      return courseData;
     },
     enabled: !!courseIdentifier,
+  });
+
+  // Debug: Log query state
+  console.log('Query enabled:', !!courseIdentifier);
+  console.log('Query isLoading:', isLoading);
+  console.log('Query data (course):', course);
+
+  // Fetch lessons for this course
+  const { data: lessons, isLoading: isLessonsLoading } = useQuery({
+    queryKey: [`lessons`, course?._id],
+    queryFn: async () => {
+      const courseId = course?._id;
+      if (!courseId) return [];
+      
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+      if (!API_BASE_URL) throw new Error('API base URL not configured');
+      
+      console.log('🎓 Fetching lessons for course:', courseId);
+      const res = await fetch(`${API_BASE_URL}/api/courses/${courseId}/lessons`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        console.warn('Lessons API failed:', res.status);
+        return [];
+      }
+      const data = await res.json();
+      console.log('✅ Lessons fetched:', data);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!course?._id,
   });
 
   // Fetch reviews for this course
@@ -226,11 +307,11 @@ export default function CourseVideosPage() {
 
   // Fetch user's enrollment status for this course
   const { data: enrollment, isLoading: enrollmentLoading } = useQuery({
-    queryKey: [`/api/courses/${courseIdentifier}/enrollment`],
+    queryKey: [`/api/courses/slug/${courseIdentifier}/enrollment`],
     queryFn: async () => {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
       if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}/api/courses/${courseIdentifier}/enrollment`, {
+      const res = await fetch(`${API_BASE_URL}/api/courses/slug/${courseIdentifier}/enrollment?userId=${user?._id}`, {
         credentials: "include",
       });
       return res.json();
@@ -248,22 +329,161 @@ export default function CourseVideosPage() {
   const COMMENTS_PAGE_SIZE = 10;
   
   const { data: commentsData = [], refetch: refetchComments, isFetching: isFetchingComments } = useQuery({
-    queryKey: [`/courses/${courseIdentifier}/comments`, commentsPage],
+    queryKey: [`/courses/${course?._id}/comments`, commentsPage],
     queryFn: async () => {
+      const courseId = course?._id;
+      if (!courseId) return [];
+      
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
       if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}/api/courses/${courseIdentifier}/comments?page=${commentsPage}&limit=${COMMENTS_PAGE_SIZE}`, {
+      const res = await fetch(`${API_BASE_URL}/api/comments/${courseId}?page=${commentsPage}&limit=${COMMENTS_PAGE_SIZE}`, {
         credentials: "include",
       });
-      return await res.json();
+      if (!res.ok) {
+        console.warn('Comments API failed:', res.status);
+        return [];
+      }
+      const data = await res.json();
+      // Ensure we return an array
+      return Array.isArray(data) ? data : [];
     },
-    enabled: !!courseIdentifier,
+    enabled: !!course?._id,
   });
 
   const [comment, setComment] = useState("");
 
-  const videoLinks = course?.videoLinks || [];
+  // Build videoLinks from lessons data
+  const videoLinks = lessons?.map((lesson: any) => ({
+    title: lesson.title,
+    url: lesson.playbackUrl || lesson.url || '',
+    lessonId: lesson._id,
+    order: lesson.order,
+    videoId: lesson.videoId,
+    type: lesson.video?.videoType || 'youtube',
+  })) || course?.videoLinks || [];
+  
+  // Debug: Log videoLinks to verify each has unique lessonId
+  console.log('🔍 VideoLinks built:', videoLinks.map((v: any, i: number) => ({
+    index: i,
+    title: v.title,
+    lessonId: v.lessonId
+  })));
+  
   const currentVideo = videoLinks[currentVideoIndex];
+
+  // Debug: Log course, lessons and videoLinks when they change
+  useEffect(() => {
+    if (course) {
+      console.log('📚 Course loaded:', course);
+      console.log('📖 Lessons from API:', lessons);
+      console.log('🎥 Video links (built):', videoLinks);
+      console.log('📊 Total videos:', videoLinks.length);
+      console.log('📈 Lesson count from course:', course.lessonCount);
+      console.log('🔢 Actual lessons fetched:', lessons?.length || 0);
+      
+      // If videoLinks is empty but lessons were fetched
+      if (videoLinks.length === 0 && lessons && lessons.length > 0) {
+        console.warn('⚠️ Lessons exist but videoLinks is empty!');
+        console.log('Lessons detail:', lessons);
+      }
+    }
+  }, [course?._id, lessons, videoLinks.length]);
+
+  // Function to fetch video URL when lesson is clicked
+  const fetchVideoUrl = async (lessonId: string) => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+      if (!API_BASE_URL) throw new Error('API base URL not configured');
+      
+      const apiUrl = `${API_BASE_URL}/api/courses/${courseIdentifier}/${lessonId}`;
+      console.log('🎬 Fetching video URL for lesson:', lessonId);
+      console.log('📡 API URL:', apiUrl);
+      
+      const res = await fetch(apiUrl, {
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('❌ Failed to fetch video URL, status:', res.status, 'error:', errorData);
+        throw new Error(errorData.message || 'Failed to fetch video URL');
+      }
+      
+      const data = await res.json();
+      console.log('✅ Video URL response:', data);
+      console.log('🎥 Playback URL:', data.url);
+      
+      if (!data.url) {
+        console.warn('⚠️ No playback URL in response');
+        return null;
+      }
+      
+      return data.url;
+    } catch (error) {
+      console.error('❌ Error fetching video URL:', error);
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to load video URL", 
+        variant: "destructive" 
+      });
+      return null;
+    }
+  };
+
+  // Handle lesson click - fetch and play video
+  const handleLessonClick = async (index: number) => {
+    console.log('👆 User clicked lesson at index:', index);
+    setCurrentVideoIndex(index);
+    const lesson = videoLinks[index];
+    
+    console.log('📝 Lesson details:', {
+      title: lesson?.title,
+      lessonId: lesson?.lessonId,
+      hasPreloadedUrl: !!lesson?.url
+    });
+    
+    // Always fetch the video URL from API to get the latest/actual playback URL
+    if (lesson?.lessonId) {
+      console.log('🔄 Fetching fresh video URL from API...');
+      const videoUrl = await fetchVideoUrl(lesson.lessonId);
+      if (videoUrl) {
+        console.log('✅ Successfully fetched video URL, now playing:', videoUrl);
+        setCurrentVideoUrl(videoUrl);
+      } else {
+        // Fallback to the embedded URL if API call fails
+        console.warn('⚠️ API call failed, falling back to preloaded URL:', lesson.url);
+        setCurrentVideoUrl(lesson.url || null);
+      }
+    } else {
+      // Fallback to the embedded URL if no lessonId
+      console.warn('⚠️ No lessonId available, using preloaded URL:', lesson.url);
+      setCurrentVideoUrl(lesson.url || null);
+    }
+  };
+
+  // Load the first video URL when course data is available
+  useEffect(() => {
+    if (course && videoLinks.length > 0) {
+      const firstLesson = videoLinks[0];
+      console.log('Loading first video:', firstLesson);
+      
+      if (firstLesson?.lessonId) {
+        fetchVideoUrl(firstLesson.lessonId).then(url => {
+          if (url) {
+            console.log('First video URL loaded:', url);
+            setCurrentVideoUrl(url);
+          } else {
+            // Fallback to original URL
+            console.log('API failed, using original URL for first video:', firstLesson.url);
+            setCurrentVideoUrl(firstLesson.url);
+          }
+        });
+      } else if (firstLesson?.url) {
+        console.log('Using original URL for first video:', firstLesson.url);
+        setCurrentVideoUrl(firstLesson.url);
+      }
+    }
+  }, [course?._id, videoLinks.length]);
 
   // Add keyboard shortcuts after course data is available
   useEffect(() => {
@@ -273,23 +493,27 @@ export default function CourseVideosPage() {
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
-          setCurrentVideoIndex(prev => Math.max(0, prev - 1));
+          if (currentVideoIndex > 0) {
+            handleLessonClick(currentVideoIndex - 1);
+          }
           break;
         case 'ArrowRight':
           e.preventDefault();
-          setCurrentVideoIndex(prev => Math.min(videoLinks.length - 1, prev + 1));
+          if (currentVideoIndex < videoLinks.length - 1) {
+            handleLessonClick(currentVideoIndex + 1);
+          }
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [videoLinks.length]);
+  }, [videoLinks.length, currentVideoIndex]);
 
-  const comments = commentsData;
+  const comments = Array.isArray(commentsData) ? commentsData : [];
   const userReview = localUserReview || reviews.find((r: any) => {
     const reviewUserId = r.userId?._id || (r.userId as any)?.id || r.userId;
-    const currentUserId = user?._id || (user as any)?.id;
+    const currentUserId = user?._id;
 
     return reviewUserId === currentUserId;
   });
@@ -331,7 +555,9 @@ export default function CourseVideosPage() {
     mutationFn: async (content: string) => {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
       if (!API_BASE_URL) throw new Error('API base URL not configured');
-      const res = await fetch(`${API_BASE_URL}/api/courses/${courseIdentifier}/comments`, {
+      const courseId = course?._id;
+      if (!courseId) throw new Error('Course ID not available');
+      const res = await fetch(`${API_BASE_URL}/api/comments/${courseId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -429,6 +655,23 @@ export default function CourseVideosPage() {
     );
   }
 
+  // Show loading state
+  if (isLoading || isLessonsLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <SiteHeader />
+        <main className="flex-1 py-10">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold mb-4">Loading course...</h1>
+            </div>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
   if (!course) {
     return (
       <div className="flex flex-col min-h-screen">
@@ -497,8 +740,8 @@ export default function CourseVideosPage() {
                 <div className="w-full aspect-video mb-4">
                   {currentVideo && (
                       <EnhancedVideoPlayer
-                        video={currentVideo}
-                        onVideoChange={setCurrentVideoIndex}
+                        video={{ ...currentVideo, currentUrl: currentVideoUrl }}
+                        onVideoChange={handleLessonClick}
                         currentIndex={currentVideoIndex}
                         totalVideos={videoLinks.length}
                       />
@@ -508,7 +751,7 @@ export default function CourseVideosPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentVideoIndex(i => Math.max(i - 1, 0))}
+                    onClick={() => handleLessonClick(Math.max(currentVideoIndex - 1, 0))}
                     disabled={currentVideoIndex === 0}
                   >
                     Previous
@@ -516,7 +759,7 @@ export default function CourseVideosPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentVideoIndex(i => Math.min(i + 1, videoLinks.length - 1))}
+                    onClick={() => handleLessonClick(Math.min(currentVideoIndex + 1, videoLinks.length - 1))}
                     disabled={currentVideoIndex === videoLinks.length - 1}
                   >
                     Next
@@ -532,15 +775,21 @@ export default function CourseVideosPage() {
             </div>
             <div className="flex-1 overflow-y-auto px-2 py-4">
               <ul className="space-y-2">
-                {videoLinks.filter((video: any) => video && video.title).map((video: { title: string; url: string }, idx: number) => (
+                {videoLinks.map((video: { title: string; url: string; lessonId?: string }, idx: number) => {
+                  if (!video || !video.title) return null;
+                  
+                  return (
                   <li
-                    key={idx}
+                    key={video.lessonId || idx}
                     className={`flex items-center gap-3 p-3 rounded cursor-pointer transition-colors border-l-4 ${
                       idx === currentVideoIndex
                         ? 'bg-primary/90 text-primary-foreground border-primary font-semibold shadow'
                         : 'hover:bg-muted/50 border-transparent'
                     }`}
-                    onClick={() => setCurrentVideoIndex(idx)}
+                    onClick={() => {
+                      console.log('📌 Clicked video at index:', idx, 'Title:', video.title, 'LessonId:', video.lessonId);
+                      handleLessonClick(idx);
+                    }}
                   >
                     <PlayCircle className={`h-5 w-5 ${idx === currentVideoIndex ? 'text-primary-foreground' : 'text-primary'}`} />
                     <span className="truncate flex-1 text-foreground text-sm md:text-base">{video.title}</span>
@@ -552,7 +801,8 @@ export default function CourseVideosPage() {
                       />
                     )}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           </aside>

@@ -19,5 +19,6 @@ export default {
   GITHUB_CALLBACK_URL: process.env.GITHUB_CALLBACK_URL || '',
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
   COURSE_SERVICE_URL: process.env.COURSE_SERVICE_URL || 'http://localhost:3005',
+  ACHIEVEMENT_SERVICE_URL: process.env.ACHIEVEMENT_SERVICE_URL || 'http://localhost:3015',
 };
 

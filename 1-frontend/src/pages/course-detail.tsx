@@ -113,7 +113,7 @@ export default function CourseDetail() {
   const addCommentMutation = useMutation({
     mutationFn: async (content: string) => {
       const courseId = course?._id;
-      const userId = user?._id || user?.id;
+      const userId = user?._id;
       if (!courseId) throw new Error('Course ID not available');
       
       console.log('Adding comment for course:', courseId, 'content:', content);
@@ -168,7 +168,7 @@ export default function CourseDetail() {
     queryKey: [`enrollment`, course?.slug, user?._id],
     queryFn: async () => {
       const courseSlug = course?.slug;
-      const userId = user?._id || user?.id;
+      const userId = user?._id;
       if (!courseSlug || !userId) return { enrolled: false };
       
       console.log('Checking enrollment for course slug:', courseSlug, 'user:', userId);
@@ -177,7 +177,7 @@ export default function CourseDetail() {
       console.log('Enrollment status:', data);
       return data;
     },
-    enabled: !!(course?.slug && (user?._id || user?.id)),
+    enabled: !!(course?.slug && user?._id),
     retry: 3,
     retryDelay: 1000,
   });
@@ -185,7 +185,7 @@ export default function CourseDetail() {
   const enrollMutation = useMutation({
     mutationFn: async () => {
       const courseSlug = course?.slug;
-      const userId = user?._id || user?.id;
+      const userId = user?._id;
       if (!courseSlug || !userId) {
         console.error('Enrollment error - Missing data:', { 
           courseSlug, 
@@ -257,7 +257,7 @@ export default function CourseDetail() {
   const reviewMutation = useMutation({
     mutationFn: async () => {
       const courseId = course?._id;
-      const userId = user?._id || user?.id;
+      const userId = user?._id;
       if (!courseId || !userId) throw new Error('Course ID or user ID not available');
       
       console.log('Submitting rating for course:', courseId, 'rating:', rating);

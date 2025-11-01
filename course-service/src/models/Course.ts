@@ -3,7 +3,9 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IVideoLink {
   title: string;
   url: string;
-  type: 'youtube';
+  type: 'youtube' | 'external' | 'uploaded';
+  lessonId?: string;
+  videoId?: string;
 }
 
 export interface ICourse extends Document {
@@ -35,9 +37,11 @@ const courseSchema = new Schema<ICourse>({
     url: { type: String, required: true },
     type: { 
       type: String, 
-      enum: ['youtube'],
+      enum: ['youtube', 'external', 'uploaded'],
       default: 'youtube'
-    }
+    },
+    lessonId: { type: Schema.Types.ObjectId, ref: 'Lesson' },
+    videoId: { type: Schema.Types.ObjectId, ref: 'Video' },
   }],
   isPublished: { type: Boolean, default: false },
 }, {
