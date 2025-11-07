@@ -13,10 +13,6 @@ services:
         VITE_BACKEND_URL: https://api.lms.amberbisht.me
         VITE_APP_NAME: ${VITE_APP_NAME}
         VITE_APP_VERSION: ${VITE_APP_VERSION}
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
-        VITE_GITHUB_CLIENT_ID: ${VITE_GITHUB_CLIENT_ID}
-        VITE_YOUTUBE_API_KEY: ${VITE_YOUTUBE_API_KEY}
-        VITE_DAILYMOTION_API_KEY: ${VITE_DAILYMOTION_API_KEY}
     container_name: lms-frontend
     restart: unless-stopped
     ports:

@@ -1,0 +1,213 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: ${DOCKER_REGISTRY_URL}${DOCKER_USERNAME}/lms-frontend:latest
+    container_name: lms-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      NODE_ENV: production
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  api-gateway:
+    image: ${DOCKER_REGISTRY_URL}${DOCKER_USERNAME}/lms-api-gateway:latest
+    container_name: lms-api-gateway
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: ${API_GATEWAY_PORT:-4000}
+      NODE_ENV: production
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:4001}
+      COURSE_SERVICE_URL: ${COURSE_SERVICE_URL:-http://course-service:4002}
+      UPLOADER_SERVICE_URL: ${UPLOADER_SERVICE_URL:-http://uploader-service:4003}
+      MEDIA_SERVICE_URL: ${MEDIA_SERVICE_URL:-http://media-service:4004}
+      COMMUNITY_SERVICE_URL: ${COMMUNITY_SERVICE_URL:-http://community-service:4005}
+      ADMIN_SERVICE_URL: ${ADMIN_SERVICE_URL:-http://admin-service:4006}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    networks:
+      - lms-network
+    depends_on:
+      - auth-service
+      - course-service
+      - uploader-service
+      - media-service
+      - community-service
+      - admin-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  auth-service:
+    image: ${DOCKER_REGISTRY_URL}${DOCKER_USERNAME}/lms-auth-service:latest
+    container_name: lms-auth-service
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      PORT: ${AUTH_SERVICE_PORT:-4001}
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRY: ${JWT_EXPIRY:-7d}
+      SESSION_SECRET: ${SESSION_SECRET}
+      SESSION_EXPIRY: ${SESSION_EXPIRY:-604800}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      COURSE_SERVICE_URL: ${COURSE_SERVICE_URL:-http://course-service:4002}
+      ACHIEVEMENT_SERVICE_URL: ${ACHIEVEMENT_SERVICE_URL}
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  course-service:
+    image: ${DOCKER_REGISTRY_URL}${DOCKER_USERNAME}/lms-course-service:latest
+    container_name: lms-course-service
+    restart: unless-stopped
+    ports:
+      - "4002:4002"
+    environment:
+      PORT: ${COURSE_SERVICE_PORT:-4002}
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:4001}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      UPLOADER_SERVICE_URL: ${UPLOADER_SERVICE_URL:-http://uploader-service:4003}
+    networks:
+      - lms-network
+    depends_on:
+      - auth-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  community-service:
+    image: ${DOCKER_REGISTRY_URL}${DOCKER_USERNAME}/lms-community-service:latest
+    container_name: lms-community-service
+    restart: unless-stopped
+    ports:
+      - "4005:4005"
+    environment:
+      PORT: ${COMMUNITY_SERVICE_PORT:-4005}
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      COURSE_SERVICE_URL: ${COURSE_SERVICE_URL:-http://course-service:4002}
+    networks:
+      - lms-network
+    depends_on:
+      - course-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  media-service:
+    image: ${DOCKER_REGISTRY_URL}${DOCKER_USERNAME}/lms-media-service:latest
+    container_name: lms-media-service
+    restart: unless-stopped
+    ports:
+      - "4004:4004"
+    environment:
+      PORT: ${MEDIA_SERVICE_PORT:-4004}
+      NODE_ENV: production
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  uploader-service:
+    image: ${DOCKER_REGISTRY_URL}${DOCKER_USERNAME}/lms-uploader-service:latest
+    container_name: lms-uploader-service
+    restart: unless-stopped
+    ports:
+      - "4003:4003"
+    volumes:
+      - uploads-data:/app/uploads
+    environment:
+      PORT: ${UPLOADER_SERVICE_PORT:-4003}
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI}
+      UPLOADER_SERVICE_URL: ${UPLOADER_SERVICE_URL:-http://uploader-service:4003}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+      MAX_VIDEO_SIZE: ${MAX_VIDEO_SIZE:-524288000}
+      ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-image/jpeg,image/png,image/gif,image/webp,application/pdf,video/mp4}
+      UPLOAD_DIR: ${UPLOAD_DIR:-./uploads}
+      CDN_URL: ${CDN_URL}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      S3_BUCKET_REGION: ${S3_BUCKET_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      USE_S3: ${USE_S3:-false}
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  admin-service:
+    image: ${DOCKER_REGISTRY_URL}${DOCKER_USERNAME}/lms-admin-service:latest
+    container_name: lms-admin-service
+    restart: unless-stopped
+    ports:
+      - "4006:4006"
+    environment:
+      PORT: ${ADMIN_SERVICE_PORT:-4006}
+      NODE_ENV: production
+      REDIS_URL: ${REDIS_URL}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  lms-network:
+    driver: bridge
+
+volumes:
+  uploads-data:
+

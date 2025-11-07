@@ -1,0 +1,527 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 1-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./1-frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./1-frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
+          VITE_APP_NAME: ${{ secrets.VITE_APP_NAME }}
+          VITE_APP_VERSION: ${{ secrets.VITE_APP_VERSION }}
+        run: npm run build:prod
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: 1-frontend/dist
+          retention-days: 7
+
+  build-api-gateway:
+    name: Build API Gateway
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: api-gateway/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./api-gateway
+        run: npm ci
+
+      - name: Build API Gateway
+        working-directory: ./api-gateway
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-gateway-dist
+          path: api-gateway/dist
+          retention-days: 7
+
+  build-auth-service:
+    name: Build Auth Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: auth-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./auth-service
+        run: npm ci
+
+      - name: Build Auth Service
+        working-directory: ./auth-service
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-service-dist
+          path: auth-service/dist
+          retention-days: 7
+
+  build-course-service:
+    name: Build Course Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: course-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./course-service
+        run: npm ci
+
+      - name: Build Course Service
+        working-directory: ./course-service
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: course-service-dist
+          path: course-service/dist
+          retention-days: 7
+
+  build-community-service:
+    name: Build Community Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: community-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./community-service
+        run: npm ci
+
+      - name: Build Community Service
+        working-directory: ./community-service
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-service-dist
+          path: community-service/dist
+          retention-days: 7
+
+  build-media-service:
+    name: Build Media Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: media-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./media-service
+        run: npm ci
+
+      - name: Build Media Service
+        working-directory: ./media-service
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-service-dist
+          path: media-service/dist
+          retention-days: 7
+
+  build-uploader-service:
+    name: Build Uploader Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: uploader-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./uploader-service
+        run: npm ci
+
+      - name: Build Uploader Service
+        working-directory: ./uploader-service
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: uploader-service-dist
+          path: uploader-service/dist
+          retention-days: 7
+
+  build-admin-service:
+    name: Build Admin Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: admin-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./admin-service
+        run: npm ci
+
+      - name: Build Admin Service
+        working-directory: ./admin-service
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-service-dist
+          path: admin-service/dist
+          retention-days: 7
+
+  build-docker-images:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs:
+      - build-frontend
+      - build-api-gateway
+      - build-auth-service
+      - build-course-service
+      - build-community-service
+      - build-media-service
+      - build-uploader-service
+      - build-admin-service
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set image prefix
+        id: image-prefix
+        run: |
+          if [ -z "${{ secrets.DOCKER_REGISTRY_URL }}" ] || [ "${{ secrets.DOCKER_REGISTRY_URL }}" == "docker.io" ]; then
+            echo "prefix=${{ secrets.DOCKER_USERNAME }}" >> $GITHUB_OUTPUT
+          else
+            echo "prefix=${{ secrets.DOCKER_REGISTRY_URL }}/${{ secrets.DOCKER_USERNAME }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY_URL != '' && secrets.DOCKER_REGISTRY_URL || 'docker.io' }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Extract metadata for frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-prefix.outputs.prefix }}/lms-frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for api-gateway
+        id: meta-api-gateway
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-prefix.outputs.prefix }}/lms-api-gateway
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for auth-service
+        id: meta-auth-service
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-prefix.outputs.prefix }}/lms-auth-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for course-service
+        id: meta-course-service
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-prefix.outputs.prefix }}/lms-course-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for community-service
+        id: meta-community-service
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-prefix.outputs.prefix }}/lms-community-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for media-service
+        id: meta-media-service
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-prefix.outputs.prefix }}/lms-media-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for uploader-service
+        id: meta-uploader-service
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-prefix.outputs.prefix }}/lms-uploader-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for admin-service
+        id: meta-admin-service
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-prefix.outputs.prefix }}/lms-admin-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./1-frontend
+          file: ./1-frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+            VITE_BACKEND_URL=${{ secrets.VITE_BACKEND_URL }}
+            VITE_APP_NAME=${{ secrets.VITE_APP_NAME }}
+            VITE_APP_VERSION=${{ secrets.VITE_APP_VERSION }}
+          cache-from: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-frontend:buildcache
+          cache-to: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-frontend:buildcache,mode=max
+
+      - name: Build and push api-gateway
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api-gateway
+          file: ./api-gateway/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api-gateway.outputs.tags }}
+          labels: ${{ steps.meta-api-gateway.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-api-gateway:buildcache
+          cache-to: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-api-gateway:buildcache,mode=max
+
+      - name: Build and push auth-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./auth-service
+          file: ./auth-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta-auth-service.outputs.tags }}
+          labels: ${{ steps.meta-auth-service.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-auth-service:buildcache
+          cache-to: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-auth-service:buildcache,mode=max
+
+      - name: Build and push course-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./course-service
+          file: ./course-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta-course-service.outputs.tags }}
+          labels: ${{ steps.meta-course-service.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-course-service:buildcache
+          cache-to: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-course-service:buildcache,mode=max
+
+      - name: Build and push community-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./community-service
+          file: ./community-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta-community-service.outputs.tags }}
+          labels: ${{ steps.meta-community-service.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-community-service:buildcache
+          cache-to: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-community-service:buildcache,mode=max
+
+      - name: Build and push media-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./media-service
+          file: ./media-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta-media-service.outputs.tags }}
+          labels: ${{ steps.meta-media-service.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-media-service:buildcache
+          cache-to: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-media-service:buildcache,mode=max
+
+      - name: Build and push uploader-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./uploader-service
+          file: ./uploader-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta-uploader-service.outputs.tags }}
+          labels: ${{ steps.meta-uploader-service.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-uploader-service:buildcache
+          cache-to: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-uploader-service:buildcache,mode=max
+
+      - name: Build and push admin-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./admin-service
+          file: ./admin-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta-admin-service.outputs.tags }}
+          labels: ${{ steps.meta-admin-service.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-admin-service:buildcache
+          cache-to: type=registry,ref=${{ steps.image-prefix.outputs.prefix }}/lms-admin-service:buildcache,mode=max
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs:
+      - build-docker-images
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          source: "docker-compose.prod.yml"
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            if [ -z "${{ secrets.DOCKER_REGISTRY_URL }}" ] || [ "${{ secrets.DOCKER_REGISTRY_URL }}" == "docker.io" ]; then
+              export DOCKER_REGISTRY_URL=""
+            else
+              export DOCKER_REGISTRY_URL="${{ secrets.DOCKER_REGISTRY_URL }}/"
+            fi
+            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            docker-compose -f docker-compose.prod.yml pull
+            docker-compose -f docker-compose.prod.yml up -d
+            docker system prune -f
+            docker image prune -f
+
