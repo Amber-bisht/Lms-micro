@@ -16,18 +16,24 @@ const app = express();
 const redisClient = createClient({
   url: config.REDIS_URL,
   socket: {
+    keepAlive: 30000, // Keep connection alive with 30s pings
     reconnectStrategy: (retries) => {
-      if (retries > 10) {
-        logger.error('Redis reconnection failed after 10 attempts');
+      if (retries > 20) {
+        logger.error('Redis reconnection failed after 20 attempts');
         return new Error('Redis reconnection failed');
       }
-      return retries * 500;
-    }
-  }
+      // Exponential backoff: 100ms, 200ms, 400ms, ... max 3s
+      return Math.min(retries * 100, 3000);
+    },
+    connectTimeout: 10000, // 10s connection timeout
+  },
 });
 
 redisClient.on('error', (err) => logger.error('Redis Client Error:', err));
-redisClient.on('connect', () => logger.info('Redis Client Connected'));
+redisClient.on('connect', () => logger.info('✅ Redis Client Connected'));
+redisClient.on('ready', () => logger.info('✅ Redis Client Ready'));
+redisClient.on('reconnecting', () => logger.info('🔄 Redis reconnecting...'));
+redisClient.on('end', () => logger.warn('⚠️ Redis connection ended'));
 
 // Connect to Redis
 (async () => {

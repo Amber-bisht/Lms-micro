@@ -20,13 +20,16 @@ export class RedisCacheService {
       this.client = createClient({
         url: this.options.url || 'redis://localhost:6379',
         socket: {
+          keepAlive: 30000, // Keep connection alive with 30s pings
           reconnectStrategy: (retries) => {
-            if (retries > 10) {
+            if (retries > 20) {
               console.error('❌ Redis cache max reconnection attempts reached');
               return new Error('Max reconnection attempts reached');
             }
+            // Exponential backoff: 100ms, 200ms, 400ms, ... max 3s
             return Math.min(retries * 100, 3000);
-          }
+          },
+          connectTimeout: 10000, // 10s connection timeout
         }
       });
 
@@ -43,6 +46,11 @@ export class RedisCacheService {
       this.client.on('ready', () => {
         console.log('🚀 Redis Cache Ready');
         this.isConnected = true;
+      });
+
+      this.client.on('reconnecting', () => {
+        console.log('🔄 Redis Cache Reconnecting...');
+        this.isConnected = false;
       });
 
       this.client.on('end', () => {
