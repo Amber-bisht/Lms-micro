@@ -1,17 +1,106 @@
 import Bull, { Job } from 'bull';
 import redis from 'ioredis';
 import { logger } from './logger';
+import config from '../config/config';
+
+// Parse Redis URL to extract connection details
+const parseRedisUrl = (url: string) => {
+  try {
+    const parsedUrl = new URL(url);
+    const isUpstash = url.toLowerCase().includes('upstash') || url.startsWith('rediss://');
+    
+    // Normalize URL: if Upstash but using redis://, convert to rediss://
+    let redisUrl = url;
+    if (isUpstash && redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
+      redisUrl = redisUrl.replace('redis://', 'rediss://');
+      logger.info('🔒 Converted Redis URL to use TLS (rediss://) for Upstash');
+    }
+    
+    return {
+      url: redisUrl,
+      isUpstash,
+      host: parsedUrl.hostname,
+      port: parsedUrl.port ? parseInt(parsedUrl.port, 10) : (isUpstash ? 6380 : 6379),
+      password: parsedUrl.password || undefined,
+      username: parsedUrl.username || undefined,
+    };
+  } catch (error) {
+    // If URL parsing fails, fall back to host/port
+    logger.warn('Failed to parse REDIS_URL, using host/port fallback');
+    return {
+      url: null,
+      isUpstash: false,
+      host: config.REDIS_HOST,
+      port: config.REDIS_PORT,
+      password: undefined,
+      username: undefined,
+    };
+  }
+};
 
 // Create separate Redis clients for Bull queue
 // Bull requires separate clients for client and subscriber without certain options
 const createRedisClient = (type: 'client' | 'subscriber') => {
-  return new redis({
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+  const redisConfig = parseRedisUrl(config.REDIS_URL);
+  const isUpstash = redisConfig.isUpstash;
+  
+  if (isUpstash) {
+    logger.info('🔐 Upstash Redis detected - TLS will be enabled');
+  }
+  
+  // ioredis configuration
+  const clientConfig: any = {
     // Remove maxRetriesPerRequest and enableReadyCheck for Bull compatibility
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
+    // Enable TLS for Upstash
+    ...(isUpstash && {
+      tls: {
+        rejectUnauthorized: true,
+      },
+    }),
+  };
+  
+  // Use URL if available (ioredis supports URL format)
+  if (redisConfig.url) {
+    clientConfig.host = redisConfig.host;
+    clientConfig.port = redisConfig.port;
+    if (redisConfig.password) {
+      clientConfig.password = redisConfig.password;
+    }
+    if (redisConfig.username && redisConfig.username !== 'default') {
+      clientConfig.username = redisConfig.username;
+    }
+  } else {
+    // Fallback to host/port
+    clientConfig.host = redisConfig.host;
+    clientConfig.port = redisConfig.port;
+  }
+  
+  const client = new redis(clientConfig);
+  
+  // Add connection event handlers
+  client.on('connect', () => {
+    logger.info(`✅ Redis ${type} connected`);
   });
+  
+  client.on('ready', () => {
+    logger.info(`✅ Redis ${type} ready`);
+  });
+  
+  client.on('error', (err) => {
+    logger.error(`❌ Redis ${type} error:`, err.message);
+  });
+  
+  client.on('close', () => {
+    logger.warn(`⚠️ Redis ${type} connection closed`);
+  });
+  
+  client.on('reconnecting', () => {
+    logger.info(`🔄 Redis ${type} reconnecting...`);
+  });
+  
+  return client;
 };
 
 export const videoQueue = new Bull('video-processing', {

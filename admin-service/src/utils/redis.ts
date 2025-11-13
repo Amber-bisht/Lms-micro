@@ -2,8 +2,24 @@ import { createClient } from 'redis';
 import { logger } from './logger';
 import config from '../config/config';
 
+// Check if URL is for Upstash (contains 'upstash' or uses 'rediss://')
+const isUpstash = 
+  config.REDIS_URL.toLowerCase().includes('upstash') || 
+  config.REDIS_URL.startsWith('rediss://');
+
+// Normalize URL: if Upstash but using redis://, convert to rediss://
+let redisUrl = config.REDIS_URL;
+if (isUpstash && redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
+  redisUrl = redisUrl.replace('redis://', 'rediss://');
+  logger.info('🔒 Converted Redis URL to use TLS (rediss://) for Upstash');
+}
+
+if (isUpstash) {
+  logger.info('🔐 Upstash Redis detected - TLS will be enabled');
+}
+
 const redisClient = createClient({
-  url: config.REDIS_URL,
+  url: redisUrl,
   socket: {
     keepAlive: 30000, // Keep connection alive with 30s pings
     reconnectStrategy: (retries) => {
@@ -15,6 +31,11 @@ const redisClient = createClient({
       return Math.min(retries * 100, 3000);
     },
     connectTimeout: 10000, // 10s connection timeout
+    // Enable TLS for Upstash Redis (even if URL doesn't have rediss://)
+    ...(isUpstash && {
+      tls: true,
+      rejectUnauthorized: true,
+    }),
   },
 });
 

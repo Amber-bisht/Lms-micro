@@ -21,5 +21,11 @@ export default {
   S3_BUCKET_REGION: process.env.S3_BUCKET_REGION || process.env.AWS_REGION || 'us-east-1',
   S3_ENDPOINT: process.env.S3_ENDPOINT || '', // For custom S3-compatible services
   USE_S3: process.env.USE_S3 === 'true' || false,
+  
+  // Redis Configuration
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  // Legacy support - fallback to host/port if URL not provided
+  REDIS_HOST: process.env.REDIS_HOST || 'localhost',
+  REDIS_PORT: parseInt(process.env.REDIS_PORT || '6379', 10),
 };
 

@@ -17,8 +17,26 @@ export class RedisCacheService {
 
   private async init() {
     try {
+      const redisUrl = this.options.url || 'redis://localhost:6379';
+      
+      // Check if URL is for Upstash (contains 'upstash' or uses 'rediss://')
+      const isUpstash = 
+        redisUrl.toLowerCase().includes('upstash') || 
+        redisUrl.startsWith('rediss://');
+
+      // Normalize URL: if Upstash but using redis://, convert to rediss://
+      let normalizedUrl = redisUrl;
+      if (isUpstash && normalizedUrl.startsWith('redis://') && !normalizedUrl.startsWith('rediss://')) {
+        normalizedUrl = normalizedUrl.replace('redis://', 'rediss://');
+        console.log('🔒 Converted Redis URL to use TLS (rediss://) for Upstash');
+      }
+
+      if (isUpstash) {
+        console.log('🔐 Upstash Redis detected - TLS will be enabled');
+      }
+
       this.client = createClient({
-        url: this.options.url || 'redis://localhost:6379',
+        url: normalizedUrl,
         socket: {
           keepAlive: 30000, // Keep connection alive with 30s pings
           reconnectStrategy: (retries) => {
@@ -30,6 +48,11 @@ export class RedisCacheService {
             return Math.min(retries * 100, 3000);
           },
           connectTimeout: 10000, // 10s connection timeout
+          // Enable TLS for Upstash Redis (even if URL doesn't have rediss://)
+          ...(isUpstash && {
+            tls: true,
+            rejectUnauthorized: true,
+          }),
         }
       });
 

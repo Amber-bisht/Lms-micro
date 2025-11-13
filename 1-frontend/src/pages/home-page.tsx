@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { Button } from "@/components/ui/button";
-import { Code, Zap, Rocket, Brain, Terminal, ArrowRight, Sparkles, Star, Play } from "lucide-react";
+import { Code, Zap, Terminal, ArrowRight, Star, Play } from "lucide-react";
 import { initPerformanceMonitoring } from "@/lib/performance-monitor";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +12,8 @@ import { apiGet } from "@/lib/api";
 
 export default function HomePage() {
   const [_, navigate] = useLocation();
+  const [gifLoaded, setGifLoaded] = React.useState(false);
+  const [gifError, setGifError] = React.useState(false);
 
   // Fetch all courses
   const { data: courses = [], isLoading, error } = useQuery<Course[]>({
@@ -32,6 +34,18 @@ export default function HomePage() {
     initPerformanceMonitoring();
   }, []);
 
+  // Preload the GIF
+  React.useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      setGifLoaded(true);
+    };
+    img.onerror = () => {
+      setGifError(true);
+    };
+    img.src = 'https://c.tenor.com/GD9UKMwnxYIAAAAC/tenor.gif';
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen">
       <SiteHeader />
@@ -46,12 +60,7 @@ export default function HomePage() {
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Left Content */}
               <div className="space-y-8">
-                <div className="inline-flex items-center px-6 py-3 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-black dark:text-white text-sm font-medium">
-                  <Sparkles className="w-4 h-4 mr-2 animate-spin" />
-                  <span className="text-black dark:text-white">🚀 Next-Gen Learning Platform</span>
-                </div>
-                
-                <h1 className="text-6xl md:text-7xl lg:text-8xl font-black text-black dark:text-white leading-tight">
+                <h1 className="text-6xl md:text-7xl lg:text-8xl font-black text-black dark:text-white leading-tight" style={{ fontFamily: 'Georgia, serif' }}>
                   Learn to <span className="text-black dark:text-white">Code</span>
                 </h1>
                 
@@ -80,47 +89,24 @@ export default function HomePage() {
               </div>
 
               {/* Right Visual */}
-              <div className="relative">
-                <div className="relative z-10 bg-gray-100 dark:bg-gray-800 rounded-3xl p-8 border border-gray-200 dark:border-gray-700">
-                  <div className="bg-gray-200 dark:bg-gray-900 rounded-2xl p-6 border border-gray-300 dark:border-gray-600">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    </div>
-                    <div className="space-y-3 font-mono text-sm">
-                      <div className="text-blue-600 dark:text-blue-400">
-                        <span className="text-purple-600 dark:text-purple-400">fn</span> <span className="text-yellow-600 dark:text-yellow-400">main</span>() <span className="text-purple-600 dark:text-purple-400">{'{'}</span>
-                      </div>
-                      <div className="text-gray-800 dark:text-white ml-4">
-                        <span className="text-blue-600 dark:text-blue-400">let</span> developer = <span className="text-green-600 dark:text-green-400">"you"</span>;
-                      </div>
-                      <div className="text-gray-800 dark:text-white ml-4">
-                        <span className="text-blue-600 dark:text-blue-400">if</span> developer == <span className="text-green-600 dark:text-green-400">"you"</span> <span className="text-purple-600 dark:text-purple-400">{'{'}</span>
-                      </div>
-                      <div className="text-gray-800 dark:text-white ml-8">
-                        <span className="text-yellow-600 dark:text-yellow-400">learn</span>(<span className="text-green-600 dark:text-green-400">"rust"</span>);
-                      </div>
-                      <div className="text-gray-800 dark:text-white ml-8">
-                        <span className="text-yellow-600 dark:text-yellow-400">build_awesome</span>(<span className="text-green-600 dark:text-green-400">"projects"</span>);
-                      </div>
-                      <div className="text-gray-800 dark:text-white ml-4">
-                        <span className="text-purple-600 dark:text-purple-400">{'}'}</span>
-                      </div>
-                      <div className="text-purple-600 dark:text-purple-400">
-                        <span className="text-purple-600 dark:text-purple-400">{'}'}</span>
-                      </div>
-                    </div>
+              <div className="relative flex items-center justify-center min-h-[400px]">
+                {!gifLoaded && !gifError && (
+                  <div className="flex items-center justify-center w-full h-full">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white"></div>
                   </div>
-                </div>
-                
-                {/* Floating Elements */}
-                <div className="absolute -top-4 -right-4 w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center animate-bounce">
-                  <Rocket className="w-8 h-8 text-white" />
-                </div>
-                <div className="absolute -bottom-4 -left-4 w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center animate-pulse">
-                  <Code className="w-6 h-6 text-white" />
-                </div>
+                )}
+                {gifError && (
+                  <div className="text-gray-500 dark:text-gray-400 text-center">
+                    Failed to load image
+                  </div>
+                )}
+                {gifLoaded && (
+                  <img 
+                    src="https://c.tenor.com/GD9UKMwnxYIAAAAC/tenor.gif" 
+                    alt="Learning Platform" 
+                    className="w-1/2 h-auto object-contain rounded-2xl transition-opacity duration-500"
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -130,10 +116,6 @@ export default function HomePage() {
         <section className="py-20 bg-white dark:bg-black">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-20">
-              <div className="inline-flex items-center px-6 py-3 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium mb-6">
-                <Brain className="w-4 h-4 mr-2" />
-                <span>Available Courses</span>
-              </div>
               <h2 className="text-5xl md:text-6xl font-black text-black dark:text-white mb-6">
                 All <span className="text-black dark:text-white">Courses</span>
               </h2>
@@ -232,27 +214,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="py-20 bg-gray-50 dark:bg-gray-900">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-4xl md:text-5xl font-black text-black dark:text-white mb-6">
-              Ready to Start Learning?
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-              Join thousands of developers who are already building amazing projects.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg" 
-                className="bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 px-8 py-4 text-lg font-semibold rounded-2xl transition-all duration-300 hover:scale-105"
-                onClick={() => navigate('/')}
-              >
-                Get Started Now
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </div>
-          </div>
-        </section>
       </main>
       
       <SiteFooter />

@@ -143,7 +143,7 @@ export function SiteHeader() {
                 <SheetContent side="right">
                   <SheetHeader>
                     <SheetTitle>LMS</SheetTitle>
-                    <SheetDescription>
+                    <SheetDescription style={{ fontFamily: 'Georgia, serif' }}>
                       Learn to code, unlock your future
                     </SheetDescription>
                   </SheetHeader>

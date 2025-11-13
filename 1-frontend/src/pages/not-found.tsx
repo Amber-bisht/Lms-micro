@@ -10,7 +10,7 @@ export default function NotFoundPage() {
         <img 
           src="https://i.ytimg.com/vi/6QfJURAhBZo/maxresdefault.jpg" 
           alt="404 - Page Not Found"
-          className="max-w-full max-h-full object-contain"
+          className="w-1/2 h-auto object-contain"
         />
       </main>
       <SiteFooter />
