@@ -29,7 +29,7 @@ app.use(cors({
 }));
 
 // Logging middleware
-app.use((req, _res, next) => {
+app.use((req: Request, _res: Response, next: NextFunction) => {
   logger.info(`${req.method} ${req.path}`);
   next();
 });
@@ -100,24 +100,27 @@ app.post('/api/test-reviews', async (req: Request, res: Response) => {
 app.use('/api/auth', createProxyMiddleware({
   target: config.AUTH_SERVICE_URL,
   changeOrigin: true,
-  cookieDomainRewrite: {
-    '*': 'localhost'
-  },
-  onProxyReq: (proxyReq, req, res) => {
+  // Only rewrite cookie domain in development
+  cookieDomainRewrite: config.NODE_ENV === 'production' 
+    ? undefined // Preserve original domain in production
+    : { '*': 'localhost' },
+  onProxyReq: (proxyReq: any, req: Request, res: Response) => {
     if (req.headers.cookie) {
       proxyReq.setHeader('cookie', req.headers.cookie);
     }
   },
-  onProxyRes: (proxyRes, req, res) => {
-    if (proxyRes.headers['set-cookie']) {
-      proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map(cookie => {
+  onProxyRes: (proxyRes: any, req: Request, res: Response) => {
+    // Only rewrite cookie domain in development
+    if (config.NODE_ENV === 'development' && proxyRes.headers['set-cookie']) {
+      proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map((cookie: string) => {
         return cookie.replace(/Domain=.*?;/, 'Domain=localhost;');
       });
     }
+    // In production, preserve the original cookie domain (.amberbisht.me)
   },
-  onError: (err, req, res) => {
+  onError: (err: Error, req: Request, res: Response) => {
     logger.error(`Auth service error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Auth service unavailable' });
+    res.status(503).json({ message: 'Auth service unavailable' });
   },
 }));
 
@@ -185,14 +188,22 @@ app.use('/api/courses', async (req: Request, res: Response) => {
     
     logger.info(`[COURSES] Final target URL: ${targetUrl}`);
     
+    // Forward cookies explicitly for session-based auth if needed
+    const headers: any = {
+      'Content-Type': 'application/json',
+      ...req.headers
+    };
+    
+    // Ensure Cookie header is forwarded if present
+    if (req.headers.cookie) {
+      headers['Cookie'] = req.headers.cookie;
+    }
+    
     const response = await axios({
       method: req.method as any,
       url: targetUrl,
       data: req.body,
-      headers: {
-        'Content-Type': 'application/json',
-        ...req.headers
-      },
+      headers,
       timeout: 10000
     });
     
@@ -214,9 +225,9 @@ app.use('/api/lessons', createProxyMiddleware({
   pathRewrite: {
     '^/api/lessons': '/api/courses/lessons'
   },
-  onError: (err, req, res) => {
+  onError: (err: Error, req: Request, res: Response) => {
     logger.error(`Lesson service error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Lesson service unavailable' });
+    res.status(503).json({ message: 'Lesson service unavailable' });
   },
 }));
 
@@ -312,9 +323,9 @@ app.use('/api/admin', createProxyMiddleware({
     '^/api/admin/comments': '/api/community/admin/comments',
     '^/api/admin': '/api/admin'
   },
-  onError: (err, req, res) => {
+  onError: (err: Error, req: Request, res: Response) => {
     logger.error(`Admin route error: ${err.message}`);
-    (res as Response).status(503).json({ message: 'Admin service unavailable' });
+    res.status(503).json({ message: 'Admin service unavailable' });
   },
 }));
 
