@@ -47,7 +47,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
           httpOnly: false,
           secure: config.NODE_ENV === 'production',
           sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
-          domain: config.NODE_ENV === 'production' ? '.amberbisht.me' : undefined,
+          domain: config.NODE_ENV === 'production' ? '.lms.amberbisht.me' : undefined,
           maxAge: 60000 // 1 minute
         });
         

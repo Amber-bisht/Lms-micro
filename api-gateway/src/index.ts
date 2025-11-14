@@ -217,6 +217,13 @@ app.use('/api/courses', async (req: Request, res: Response) => {
     });
     
     logger.info(`[COURSES] Response status: ${response.status}`);
+    logger.info(`[COURSES] Response data length: ${Array.isArray(response.data) ? response.data.length : 'not an array'}`);
+    
+    // Set cache control headers to prevent stale responses
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     res.status(response.status).json(response.data);
   } catch (error: any) {
     logger.error(`[COURSES] Direct call error: ${error.message}`);

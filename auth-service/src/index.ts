@@ -84,7 +84,7 @@ app.use(
       httpOnly: true,
       maxAge: config.SESSION_EXPIRY * 1000,
       sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
-      domain: config.NODE_ENV === 'production' ? '.amberbisht.me' : undefined,
+      domain: config.NODE_ENV === 'production' ? '.lms.amberbisht.me' : undefined,
       path: '/',
     },
   })

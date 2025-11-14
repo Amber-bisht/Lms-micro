@@ -29,7 +29,18 @@ export const getAllCourses = async (req: Request, res: Response): Promise<void> 
                           req.query.admin === 'true';
     
     const query = isAdminRequest ? {} : { isPublished: true };
+    
+    logger.info(`[getAllCourses] Query: ${JSON.stringify(query)}, isAdminRequest: ${isAdminRequest}`);
+    
     const courses = await Course.find(query);
+    
+    logger.info(`[getAllCourses] Found ${courses.length} courses`);
+    
+    // Set cache control headers to prevent stale responses
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     res.status(200).json(courses);
   } catch (error) {
     logger.error('Error fetching courses:', error);
