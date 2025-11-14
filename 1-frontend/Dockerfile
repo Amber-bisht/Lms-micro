@@ -13,9 +13,9 @@ RUN npm ci
 COPY . .
 
 # Create .env file with build-time environment variables
-ARG VITE_API_URL=https://api.amberbisht.me/api
-ARG VITE_API_BASE_URL=https://api.amberbisht.me
-ARG VITE_BACKEND_URL=https://api.amberbisht.me
+ARG VITE_API_URL=https://api.lms.amberbisht.me/api
+ARG VITE_API_BASE_URL=https://api.lms.amberbisht.me
+ARG VITE_BACKEND_URL=https://api.lms.amberbisht.me
 ARG VITE_APP_NAME
 ARG VITE_APP_VERSION
 

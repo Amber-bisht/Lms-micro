@@ -38,7 +38,7 @@ export default function AuthSuccessPage() {
           console.log(`Attempting authentication check (attempt ${retryCount + 1})...`);
           
           // Check if the user is authenticated by calling the backend
-          const response = await apiGet('/auth/me');
+          const response = await apiGet('/api/auth/me');
 
           console.log('Auth response status:', response.status);
           console.log('Auth response headers:', Object.fromEntries(response.headers.entries()));
