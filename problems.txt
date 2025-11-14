@@ -1,0 +1,5 @@
+lms-auth
+lms-community
+lms-courses
+lms-lite
+lms-uploader
