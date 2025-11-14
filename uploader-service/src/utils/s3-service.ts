@@ -4,10 +4,22 @@ import config from '../config/config';
 import { logger } from './logger';
 
 class S3Service {
-  private s3Client: S3Client;
-  private bucketName: string;
+  private s3Client: S3Client | null = null;
+  private bucketName: string = '';
+  private initialized: boolean = false;
 
-  constructor() {
+  private initialize() {
+    if (this.initialized) {
+      return;
+    }
+
+    // Only initialize if S3 is enabled
+    if (!config.USE_S3) {
+      logger.warn('S3 Service: USE_S3 is false, S3 operations will not work');
+      this.initialized = true;
+      return;
+    }
+
     this.bucketName = config.S3_BUCKET_NAME;
     
     if (!this.bucketName) {
@@ -30,6 +42,16 @@ class S3Service {
     }
 
     this.s3Client = new S3Client(s3Config);
+    this.initialized = true;
+  }
+
+  private ensureInitialized() {
+    if (!this.initialized) {
+      this.initialize();
+    }
+    if (!config.USE_S3 || !this.s3Client) {
+      throw new Error('S3 is not enabled or not properly initialized');
+    }
   }
 
   /**
@@ -41,6 +63,7 @@ class S3Service {
     contentType: string,
     metadata?: Record<string, string>
   ): Promise<string> {
+    this.ensureInitialized();
     try {
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
@@ -50,7 +73,7 @@ class S3Service {
         Metadata: metadata,
       });
 
-      await this.s3Client.send(command);
+      await this.s3Client!.send(command);
       
       // Generate the public URL
       const url = this.getPublicUrl(key);
@@ -67,13 +90,14 @@ class S3Service {
    * Delete a file from S3
    */
   async deleteFile(key: string): Promise<void> {
+    this.ensureInitialized();
     try {
       const command = new DeleteObjectCommand({
         Bucket: this.bucketName,
         Key: key,
       });
 
-      await this.s3Client.send(command);
+      await this.s3Client!.send(command);
       logger.info(`File deleted from S3: ${key}`);
     } catch (error) {
       logger.error('S3 delete error:', error);
@@ -89,6 +113,7 @@ class S3Service {
     contentType: string,
     expiresIn: number = 3600
   ): Promise<string> {
+    this.ensureInitialized();
     try {
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
@@ -96,7 +121,7 @@ class S3Service {
         ContentType: contentType,
       });
 
-      const presignedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+      const presignedUrl = await getSignedUrl(this.s3Client!, command, { expiresIn });
       return presignedUrl;
     } catch (error) {
       logger.error('S3 presigned URL generation error:', error);
@@ -111,13 +136,14 @@ class S3Service {
     key: string,
     expiresIn: number = 3600
   ): Promise<string> {
+    this.ensureInitialized();
     try {
       const command = new GetObjectCommand({
         Bucket: this.bucketName,
         Key: key,
       });
 
-      const presignedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+      const presignedUrl = await getSignedUrl(this.s3Client!, command, { expiresIn });
       return presignedUrl;
     } catch (error) {
       logger.error('S3 presigned download URL generation error:', error);
@@ -129,6 +155,9 @@ class S3Service {
    * Get the public URL for a file
    */
   getPublicUrl(key: string): string {
+    if (!config.USE_S3 || !this.bucketName) {
+      throw new Error('S3 is not enabled or bucket name is not set');
+    }
     if (config.S3_ENDPOINT) {
       // For custom S3-compatible services
       return `${config.S3_ENDPOINT}/${this.bucketName}/${key}`;
@@ -161,6 +190,26 @@ class S3Service {
   }
 }
 
-// Export singleton instance
-export const s3Service = new S3Service();
-export default s3Service;
+// Export singleton instance (lazy initialization)
+let s3ServiceInstance: S3Service | null = null;
+
+export const getS3Service = (): S3Service => {
+  if (!s3ServiceInstance) {
+    s3ServiceInstance = new S3Service();
+  }
+  return s3ServiceInstance;
+};
+
+// For backward compatibility, export a proxy that creates instance on first use
+const s3ServiceProxy = new Proxy({} as S3Service, {
+  get(_target, prop) {
+    const instance = getS3Service();
+    const value = (instance as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(instance);
+    }
+    return value;
+  }
+});
+
+export default s3ServiceProxy;

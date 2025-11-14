@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { connectDB, disconnectDB } from './config/database';
 import { logger } from './utils/logger';
+import { logEnvironmentVariables } from './utils/env-logger';
 import config from './config/config';
 import courseRoutes from './routes/course.routes';
 
@@ -38,6 +39,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 // Initialize app
 (async () => {
   try {
+    // Log environment variables
+    logEnvironmentVariables('course-service', config);
+    
     await connectDB();
     
     const port = config.PORT;

@@ -6,6 +6,7 @@ import RedisStore from 'connect-redis';
 import { createClient } from 'redis';
 import { connectDB, disconnectDB } from './config/database';
 import { logger } from './utils/logger';
+import { logEnvironmentVariables } from './utils/env-logger';
 import config from './config/config';
 import authRoutes from './routes/auth.routes';
 import passport from './config/passport';
@@ -122,6 +123,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 // Initialize app
 (async () => {
   try {
+    // Log environment variables
+    logEnvironmentVariables('auth-service', config);
+    
     await connectDB();
     
     const port = config.PORT;

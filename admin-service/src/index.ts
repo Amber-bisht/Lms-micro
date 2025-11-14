@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { logger } from './utils/logger';
+import { logEnvironmentVariables } from './utils/env-logger';
 import config from './config/config';
 import adminRoutes from './routes/admin.routes';
 import { connectRedis, disconnectRedis } from './utils/redis';
@@ -30,6 +31,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 (async () => {
   try {
+    // Log environment variables
+    logEnvironmentVariables('admin-service', config);
+    
     await connectRedis();
     
     const port = config.PORT;

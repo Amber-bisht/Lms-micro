@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { connectDB, disconnectDB } from './config/database';
 import { logger } from './utils/logger';
+import { logEnvironmentVariables } from './utils/env-logger';
 import config from './config/config';
 import communityRoutes from './routes/community.routes';
 
@@ -34,6 +35,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 (async () => {
   try {
+    // Log environment variables
+    logEnvironmentVariables('community-service', config);
+    
     await connectDB();
     
     const port = config.PORT;

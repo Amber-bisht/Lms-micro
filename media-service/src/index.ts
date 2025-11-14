@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { logger } from './utils/logger';
+import { logEnvironmentVariables } from './utils/env-logger';
 import config from './config/config';
 import mediaRoutes from './routes/media.routes';
 
@@ -26,6 +27,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   logger.error(`Error: ${err.message}`);
   res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
 });
+
+// Log environment variables
+logEnvironmentVariables('media-service', config);
 
 const port = config.PORT;
 app.listen(port, '0.0.0.0', () => {

@@ -5,6 +5,7 @@ import multer from 'multer';
 import config from './config/config';
 import { connectDatabase } from './config/database';
 import { logger } from './utils/logger';
+import { logEnvironmentVariables } from './utils/env-logger';
 import uploadRoutes from './routes/upload.routes';
 import fileToLinkRoutes from './routes/file-to-link.routes';
 import videoRoutes from './routes/video.routes';
@@ -140,6 +141,9 @@ videoQueue.process('process-video', async (job: any) => {
 // Start server
 const startServer = async () => {
   try {
+    // Log environment variables
+    logEnvironmentVariables('uploader-service', config);
+    
     // Connect to database
     await connectDatabase();
 

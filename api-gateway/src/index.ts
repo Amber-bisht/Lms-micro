@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { logger } from './utils/logger';
+import { logEnvironmentVariables } from './utils/env-logger';
 import config from './config/config';
 import { authMiddleware } from './middleware/auth.middleware';
 import axios from 'axios';
@@ -379,6 +380,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // Start server
+// Log environment variables
+logEnvironmentVariables('api-gateway', config);
+
 const PORT = config.PORT;
 app.listen(PORT, '0.0.0.0', () => {
   logger.info(`🚀 API Gateway running on port ${PORT}`);
