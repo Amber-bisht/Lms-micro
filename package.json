@@ -1,68 +1,20 @@
 {
-  "name": "lms-microservices",
+  "name": "docker-logs-checker",
   "version": "1.0.0",
-  "description": "Learning Management System - Microservices Architecture",
-  "private": true,
+  "description": "Script to check Docker logs on remote server",
+  "main": "check-docker-logs.js",
   "scripts": {
-    "kill": "taskkill /f /im node.exe",
-    "flush":"docker exec -it lms-redis redis-cli FLUSHALL",
-    "install:all": "npm run install:services && npm run install:frontend",
-    "install:services": "cd auth-service && npm install && cd ../course-service && npm install && cd ../uploader-service && npm install && cd ../content-service && npm install && cd ../media-service && npm install && cd ../community-service && npm install && cd ../admin-service && npm install && cd ../api-gateway && npm install && cd ..",
-    "install:frontend": "cd frontend && npm install && cd ..",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f",
-    "docker:build": "docker-compose build",
-    "docker:restart": "docker-compose restart",
-    "dev:all": "concurrently \"npm run dev:service\" \"npm run dev:for\"",
-    "dev:for": "cd 1-frontend && npm run dev",
-    "dev:service": "concurrently \"npm run dev:auth\" \"npm run dev:course\" \"npm run dev:uploader\" \"npm run dev:content\" \"npm run dev:media\" \"npm run dev:community\" \"npm run dev:admin\" \"npm run dev:gateway\"",
-    "dev:auth": "cd auth-service && npm run dev",
-    "dev:course": "cd course-service && npm run dev",
-    "dev:uploader": "cd uploader-service && npm run dev",
-    "dev:content": "cd content-service && npm run dev",
-    "dev:media": "cd media-service && npm run dev",
-    "dev:community": "cd community-service && npm run dev",
-    "dev:admin": "cd admin-service && npm run dev",
-    "dev:gateway": "cd api-gateway && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "build:all": "npm run build:services && npm run build:frontend",
-    "build:services": "cd auth-service && npm run build && cd ../course-service && npm run build && cd ../uploader-service && npm run build && cd ../content-service && npm run build && cd ../media-service && npm run build && cd ../community-service && npm run build && cd ../admin-service && npm run build && cd ../api-gateway && npm run build && cd ..",
-    "build:frontend": "cd frontend && npm run build && cd ..",
-    "clean": "node -e \"require('child_process').execSync('rd /s /q node_modules auth-service\\\\node_modules course-service\\\\node_modules uploader-service\\\\node_modules content-service\\\\node_modules media-service\\\\node_modules community-service\\\\node_modules admin-service\\\\node_modules api-gateway\\\\node_modules frontend\\\\node_modules', {stdio:'inherit', shell:true})\""
+    "start": "node check-docker-logs.js",
+    "check-logs": "node check-docker-logs.js"
   },
-  "workspaces": [
-    "auth-service",
-    "course-service",
-    "uploader-service",
-    "content-service",
-    "media-service",
-    "community-service",
-    "admin-service",
-    "api-gateway",
-    "frontend"
-  ],
+  "dependencies": {
+    "ssh2": "^1.17.0"
+  },
   "keywords": [
-    "lms",
-    "microservices",
-    "learning",
-    "education",
-    "nodejs",
-    "typescript",
-    "react",
-    "mongodb"
+    "docker",
+    "logs",
+    "ssh"
   ],
-  "author": "Amber Bisht",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/amber-bisht/lms-microservices"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
-  }
+  "author": "",
+  "license": "ISC"
 }

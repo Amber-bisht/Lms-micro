@@ -514,12 +514,56 @@ jobs:
           password: ${{ secrets.DEPLOY_PASSWORD }}
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
+            # Set Docker registry variables
             if [ -z "${{ secrets.DOCKER_REGISTRY_URL }}" ] || [ "${{ secrets.DOCKER_REGISTRY_URL }}" == "docker.io" ]; then
               export DOCKER_REGISTRY_URL=""
             else
               export DOCKER_REGISTRY_URL="${{ secrets.DOCKER_REGISTRY_URL }}/"
             fi
             export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            
+            # Export all environment variables from GitHub secrets
+            export FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
+            export API_GATEWAY_PORT="${{ secrets.API_GATEWAY_PORT }}"
+            export AUTH_SERVICE_PORT="${{ secrets.AUTH_SERVICE_PORT }}"
+            export COURSE_SERVICE_PORT="${{ secrets.COURSE_SERVICE_PORT }}"
+            export UPLOADER_SERVICE_PORT="${{ secrets.UPLOADER_SERVICE_PORT }}"
+            export MEDIA_SERVICE_PORT="${{ secrets.MEDIA_SERVICE_PORT }}"
+            export COMMUNITY_SERVICE_PORT="${{ secrets.COMMUNITY_SERVICE_PORT }}"
+            export ADMIN_SERVICE_PORT="${{ secrets.ADMIN_SERVICE_PORT }}"
+            export MONGODB_URI="${{ secrets.MONGODB_URI }}"
+            export REDIS_URL="${{ secrets.REDIS_URL }}"
+            export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+            export JWT_EXPIRY="${{ secrets.JWT_EXPIRY }}"
+            export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
+            export SESSION_EXPIRY="${{ secrets.SESSION_EXPIRY }}"
+            export GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}"
+            export GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
+            export GOOGLE_CALLBACK_URL="${{ secrets.GOOGLE_CALLBACK_URL }}"
+            export GITHUB_CLIENT_ID="${{ secrets.GITHUB_CLIENT_ID }}"
+            export GITHUB_CLIENT_SECRET="${{ secrets.GITHUB_CLIENT_SECRET }}"
+            export GITHUB_CALLBACK_URL="${{ secrets.GITHUB_CALLBACK_URL }}"
+            export AUTH_SERVICE_URL="${{ secrets.AUTH_SERVICE_URL }}"
+            export COURSE_SERVICE_URL="${{ secrets.COURSE_SERVICE_URL }}"
+            export UPLOADER_SERVICE_URL="${{ secrets.UPLOADER_SERVICE_URL }}"
+            export MEDIA_SERVICE_URL="${{ secrets.MEDIA_SERVICE_URL }}"
+            export COMMUNITY_SERVICE_URL="${{ secrets.COMMUNITY_SERVICE_URL }}"
+            export ADMIN_SERVICE_URL="${{ secrets.ADMIN_SERVICE_URL }}"
+            export ACHIEVEMENT_SERVICE_URL="${{ secrets.ACHIEVEMENT_SERVICE_URL }}"
+            export YOUTUBE_API_KEY="${{ secrets.YOUTUBE_API_KEY }}"
+            export MAX_FILE_SIZE="${{ secrets.MAX_FILE_SIZE }}"
+            export MAX_VIDEO_SIZE="${{ secrets.MAX_VIDEO_SIZE }}"
+            export ALLOWED_FILE_TYPES="${{ secrets.ALLOWED_FILE_TYPES }}"
+            export UPLOAD_DIR="${{ secrets.UPLOAD_DIR }}"
+            export CDN_URL="${{ secrets.CDN_URL }}"
+            export AWS_REGION="${{ secrets.AWS_REGION }}"
+            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            export S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
+            export S3_BUCKET_REGION="${{ secrets.S3_BUCKET_REGION }}"
+            export S3_ENDPOINT="${{ secrets.S3_ENDPOINT }}"
+            export USE_S3="${{ secrets.USE_S3 }}"
+            
             docker-compose -f docker-compose.prod.yml pull
             docker-compose -f docker-compose.prod.yml up -d
             docker system prune -f
