@@ -110,6 +110,11 @@ app.use('/api/auth', createProxyMiddleware({
     }
   },
   onProxyRes: (proxyRes: any, req: Request, res: Response) => {
+    // Log cookies being set (for debugging)
+    if (proxyRes.headers['set-cookie']) {
+      logger.info(`[AUTH PROXY] Setting cookies: ${JSON.stringify(proxyRes.headers['set-cookie'])}`);
+    }
+    
     // Only rewrite cookie domain in development
     if (config.NODE_ENV === 'development' && proxyRes.headers['set-cookie']) {
       proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map((cookie: string) => {
@@ -117,6 +122,10 @@ app.use('/api/auth', createProxyMiddleware({
       });
     }
     // In production, preserve the original cookie domain (.amberbisht.me)
+    // Ensure cookies are properly forwarded for redirects
+    if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers['set-cookie']) {
+      logger.info(`[AUTH PROXY] Redirect with cookies - Status: ${proxyRes.statusCode}, Cookies: ${JSON.stringify(proxyRes.headers['set-cookie'])}`);
+    }
   },
   onError: (err: Error, req: Request, res: Response) => {
     logger.error(`Auth service error: ${err.message}`);
