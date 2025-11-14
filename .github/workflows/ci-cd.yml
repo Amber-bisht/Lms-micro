@@ -63,11 +63,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: api-gateway/package.json
 
       - name: Install dependencies
         working-directory: ./api-gateway
-        run: npm ci
+        run: npm install
 
       - name: Build API Gateway
         working-directory: ./api-gateway
@@ -92,11 +92,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: auth-service/package.json
 
       - name: Install dependencies
         working-directory: ./auth-service
-        run: npm ci
+        run: npm install
 
       - name: Build Auth Service
         working-directory: ./auth-service
@@ -121,11 +121,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: course-service/package.json
 
       - name: Install dependencies
         working-directory: ./course-service
-        run: npm ci
+        run: npm install
 
       - name: Build Course Service
         working-directory: ./course-service
@@ -150,11 +150,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: community-service/package.json
 
       - name: Install dependencies
         working-directory: ./community-service
-        run: npm ci
+        run: npm install
 
       - name: Build Community Service
         working-directory: ./community-service
@@ -178,11 +178,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: media-service/package.json
 
       - name: Install dependencies
         working-directory: ./media-service
-        run: npm ci
+        run: npm install
 
       - name: Build Media Service
         working-directory: ./media-service
@@ -207,11 +207,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: uploader-service/package.json
 
       - name: Install dependencies
         working-directory: ./uploader-service
-        run: npm ci
+        run: npm install
 
       - name: Build Uploader Service
         working-directory: ./uploader-service
@@ -236,11 +236,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: admin-service/package.json
 
       - name: Install dependencies
         working-directory: ./admin-service
-        run: npm ci
+        run: npm install
 
       - name: Build Admin Service
         working-directory: ./admin-service
