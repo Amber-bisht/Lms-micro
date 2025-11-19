@@ -582,6 +582,41 @@ export const validateToken = async (req: Request, res: Response): Promise<void> 
   }
 };
 
+export const validateSession = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Check if user is authenticated via Passport session
+    if (req.isAuthenticated && req.isAuthenticated() && req.user) {
+      const user = await User.findById((req.user as any)._id).select('-password');
+      if (!user) {
+        res.status(404).json({ valid: false, message: 'User not found' });
+        return;
+      }
+
+      if (user.banned) {
+        res.status(403).json({ valid: false, message: 'User is banned' });
+        return;
+      }
+
+      res.json({
+        valid: true,
+        user: {
+          id: user._id.toString(),
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          isAdmin: user.isAdmin,
+        }
+      });
+      return;
+    }
+
+    res.status(401).json({ valid: false, message: 'No valid session' });
+  } catch (error) {
+    logger.error('Session validation error:', error);
+    res.status(401).json({ valid: false, message: 'Session validation failed' });
+  }
+};
+
 // Get user profile by ID
 export const getUserProfile = async (req: Request, res: Response): Promise<void> => {
   try {

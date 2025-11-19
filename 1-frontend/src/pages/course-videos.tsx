@@ -358,7 +358,7 @@ export default function CourseVideosPage() {
     queryFn: async () => {
       const courseId = course?._id;
       if (!courseId) return [];
-      
+
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
       if (!API_BASE_URL) throw new Error('API base URL not configured');
       const res = await fetch(`${API_BASE_URL}/api/comments/${courseId}?page=${commentsPage}&limit=${COMMENTS_PAGE_SIZE}`, {
@@ -490,7 +490,33 @@ export default function CourseVideosPage() {
 
   const comments = Array.isArray(commentsData) ? commentsData : [];
   const reviewsArray = Array.isArray(reviews) ? reviews : [];
-  const userReview = localUserReview || reviewsArray.find((r: any) => {
+  
+  // Fetch user's specific review
+  const { data: userReviewData } = useQuery({
+    queryKey: [`userReview`, course?._id, user?._id],
+    queryFn: async () => {
+      const courseId = course?._id;
+      const userId = user?._id;
+      if (!courseId || !userId) return null;
+      
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+      if (!API_BASE_URL) return null;
+      
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/reviews/course/${courseId}/user/${userId}`,
+          { credentials: "include" }
+        );
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (error) {
+        return null;
+      }
+    },
+    enabled: !!(course?._id && user?._id),
+  });
+  
+  const userReview = localUserReview || userReviewData || reviewsArray.find((r: any) => {
     const reviewUserId = r.userId?._id || (r.userId as any)?.id || r.userId;
     const currentUserId = user?._id;
 
@@ -524,8 +550,43 @@ export default function CourseVideosPage() {
       setRating(0);
       toast({ title: "Thank you!", description: "Your rating has been submitted." });
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err?.message || "Failed to submit rating", variant: "destructive" });
+    onError: async (err: any) => {
+      const errorMessage = err?.message || "Failed to submit rating";
+      
+      // If user already reviewed, fetch their existing review
+      if (errorMessage.includes("already reviewed")) {
+        const courseId = course?._id;
+        const userId = user?._id;
+        
+        if (courseId && userId) {
+          try {
+            const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+            if (API_BASE_URL) {
+              // Fetch user's existing review
+              const reviewRes = await fetch(
+                `${API_BASE_URL}/api/reviews/course/${courseId}/user/${userId}`,
+                { credentials: "include" }
+              );
+              
+              if (reviewRes.ok) {
+                const existingReview = await reviewRes.json();
+                setLocalUserReview(existingReview);
+                refetchReviews();
+                toast({ 
+                  title: "Already Reviewed", 
+                  description: `You've already rated this course ${existingReview.rating} stars.`,
+                  variant: "default"
+                });
+                return;
+              }
+            }
+          } catch (fetchError) {
+            console.error('Error fetching existing review:', fetchError);
+          }
+        }
+      }
+      
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
 
@@ -533,23 +594,30 @@ export default function CourseVideosPage() {
     mutationFn: async (content: string) => {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
       if (!API_BASE_URL) throw new Error('API base URL not configured');
+
       const courseId = course?._id;
       if (!courseId) throw new Error('Course ID not available');
+
       const res = await fetch(`${API_BASE_URL}/api/comments/${courseId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ content }),
       });
-      if (!res.ok) throw await res.json();
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw errorData;
+      }
       return await res.json();
     },
     onSuccess: () => {
       refetchComments();
       setComment("");
+      toast({ title: "Success", description: "Comment added successfully" });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err?.error || "Failed to add comment", variant: "destructive" });
+      const errorMessage = err?.error || err?.message || "Failed to add comment";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
 
@@ -866,7 +934,7 @@ export default function CourseVideosPage() {
             <h2 className="text-2xl font-bold">{comments.length} Comments</h2>
           </div>
           {/* Add a comment */}
-          {user && (
+          {user && canComment && (
             <div className="flex items-start gap-3 mb-8">
               <Avatar className="h-10 w-10">
                 <AvatarImage src={user.avatar} alt={user.username} />
@@ -897,6 +965,14 @@ export default function CourseVideosPage() {
               </form>
             </div>
           )}
+          {/* Show message when user has reached comment limit */}
+          {user && !canComment && userComments.length >= 5 && (
+            <div className="mb-8 p-4 bg-muted rounded-lg border">
+              <p className="text-sm text-muted-foreground">
+                You have reached the maximum limit of 5 comments per course. You cannot add more comments.
+              </p>
+            </div>
+          )}
           {/* Comments list */}
           <ul className="space-y-0 mb-8">
             {comments.map((c: any, idx: number) => (
@@ -908,12 +984,9 @@ export default function CourseVideosPage() {
                   </Avatar>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <Link
-                        href={`/user/${c.user?.username || "User"}`}
-                        className="font-semibold text-base text-primary hover:text-primary/80 hover:underline cursor-pointer"
-                      >
+                      <span className="font-semibold text-base text-primary">
                         @{c.user?.username || "User"}
-                      </Link>
+                      </span>
                       <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}</span>
                     </div>
                     <div className="text-base leading-relaxed whitespace-pre-line mb-2">{c.content}</div>

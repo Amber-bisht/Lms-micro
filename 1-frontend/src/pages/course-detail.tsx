@@ -100,29 +100,43 @@ export default function CourseDetail() {
       if (!courseId) return [];
       
       console.log('Fetching comments for course:', courseId);
-      const response = await apiGet(`/api/comments/${courseId}?page=${commentsPage}&limit=${COMMENTS_PAGE_SIZE}`);
-      const data = await response.json();
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+      if (!API_BASE_URL) throw new Error('API base URL not configured');
+      const res = await fetch(`${API_BASE_URL}/api/comments/${courseId}?page=${commentsPage}&limit=${COMMENTS_PAGE_SIZE}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        return [];
+      }
+      const data = await res.json();
       console.log('Comments data:', data);
-      return data;
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!course?._id,
   });
-  const comments = commentsData;
+  const comments = Array.isArray(commentsData) ? commentsData : [];
 
   // Add comment mutation
   const addCommentMutation = useMutation({
     mutationFn: async (content: string) => {
       const courseId = course?._id;
-      const userId = user?._id;
       if (!courseId) throw new Error('Course ID not available');
       
       console.log('Adding comment for course:', courseId, 'content:', content);
-      const response = await apiPost(`/api/comments/${courseId}`, {
-        content,
-        userId: userId,
-        username: user?.username,
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+      if (!API_BASE_URL) throw new Error('API base URL not configured');
+      
+      const res = await fetch(`${API_BASE_URL}/api/comments/${courseId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content }),
       });
-      const data = await response.json();
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw errorData;
+      }
+      const data = await res.json();
       console.log('Add comment response:', data);
       return data;
     },
@@ -133,7 +147,8 @@ export default function CourseDetail() {
     },
     onError: (err: any) => {
       console.error('Add comment error:', err);
-      toast({ title: "Error", description: err?.error || "Failed to add comment", variant: "destructive" });
+      const errorMessage = err?.error || err?.message || "Failed to add comment";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
   
@@ -154,14 +169,29 @@ export default function CourseDetail() {
     retryDelay: 1000,
   });
   
-  const { data: reviews = [], isLoading: isReviewsLoading } = useQuery<Review[]>({
-    queryKey: [`reviews`, course?._id],
+  const { data: reviews = [], isLoading: isReviewsLoading, refetch: refetchReviews } = useQuery<Review[]>({
+    queryKey: [`reviews`, course?.slug || course?._id],
     queryFn: async () => {
-      // Reviews functionality temporarily disabled
-      // TODO: Add proper reviews route to API gateway
-      return [];
+      const courseSlug = course?.slug?.trim() || course?._id;
+      if (!courseSlug) return [];
+      
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+      if (!API_BASE_URL) throw new Error('API base URL not configured');
+      
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/courses/${courseSlug}/reviews`, {
+          credentials: "include",
+        });
+        if (!res.ok) {
+          return [];
+        }
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        return [];
+      }
     },
-    enabled: false, // Disabled until API gateway is updated
+    enabled: !!(course?.slug || course?._id),
   });
   
   const { data: enrollment, isLoading: isEnrollmentLoading } = useQuery<{ enrolled: boolean }>({
@@ -246,9 +276,34 @@ export default function CourseDetail() {
   const userComments = comments.filter((c: any) => c.user?._id === user?._id);
   const canComment = enrollment?.enrolled && userComments.length < 5;
   
+  // Fetch user's specific review
+  const { data: userReviewData } = useQuery({
+    queryKey: [`userReview`, course?._id, user?._id],
+    queryFn: async () => {
+      const courseId = course?._id;
+      const userId = user?._id;
+      if (!courseId || !userId) return null;
+      
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+      if (!API_BASE_URL) return null;
+      
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/reviews/course/${courseId}/user/${userId}`,
+          { credentials: "include" }
+        );
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (error) {
+        return null;
+      }
+    },
+    enabled: !!(course?._id && user?._id),
+  });
+  
   // Add local state for userReview
   const [localUserReview, setLocalUserReview] = useState(null);
-  const userReview = localUserReview || reviews?.find((r: any) => {
+  const userReview = localUserReview || userReviewData || reviews?.find((r: any) => {
     const userId = typeof r.userId === 'string' ? r.userId : r.userId?._id;
     return userId === user?._id;
   });
@@ -280,9 +335,44 @@ export default function CourseDetail() {
       setRating(0);
       toast({ title: "Thank you!", description: "Your rating has been submitted." });
     },
-    onError: (err: any) => {
+    onError: async (err: any) => {
       console.error('Rating error:', err);
-      toast({ title: "Error", description: err?.message || "Failed to submit rating", variant: "destructive" });
+      const errorMessage = err?.message || "Failed to submit rating";
+      
+      // If user already reviewed, fetch their existing review
+      if (errorMessage.includes("already reviewed")) {
+        const courseId = course?._id;
+        const userId = user?._id;
+        
+        if (courseId && userId) {
+          try {
+            const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL;
+            if (API_BASE_URL) {
+              // Fetch user's existing review
+              const reviewRes = await fetch(
+                `${API_BASE_URL}/api/reviews/course/${courseId}/user/${userId}`,
+                { credentials: "include" }
+              );
+              
+              if (reviewRes.ok) {
+                const existingReview = await reviewRes.json();
+                setLocalUserReview(existingReview);
+                refetchReviews();
+                toast({ 
+                  title: "Already Reviewed", 
+                  description: `You've already rated this course ${existingReview.rating} stars.`,
+                  variant: "default"
+                });
+                return;
+              }
+            }
+          } catch (fetchError) {
+            console.error('Error fetching existing review:', fetchError);
+          }
+        }
+      }
+      
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
   
@@ -656,7 +746,7 @@ export default function CourseDetail() {
             )}
 
             {/* Add a comment */}
-            {user && (
+            {user && canComment && (
               <div className="flex items-start gap-3 mb-8">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={user.avatar} alt={user.username} />
@@ -687,6 +777,14 @@ export default function CourseDetail() {
                 </form>
               </div>
             )}
+            {/* Show message when user has reached comment limit */}
+            {user && !canComment && userComments.length >= 5 && (
+              <div className="mb-8 p-4 bg-muted rounded-lg border">
+                <p className="text-sm text-muted-foreground">
+                  You have reached the maximum limit of 5 comments per course. You cannot add more comments.
+                </p>
+              </div>
+            )}
             {/* Comments list */}
             <ul className="space-y-0 mb-8">
               {comments.map((c: any, idx: number) => (
@@ -698,12 +796,9 @@ export default function CourseDetail() {
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <Link
-                          href={`/user/${c.user?.username || "User"}`}
-                          className="font-semibold text-base text-primary hover:text-primary/80 hover:underline cursor-pointer"
-                        >
+                        <span className="font-semibold text-base text-primary">
                           @{c.user?.username || "User"}
-                        </Link>
+                        </span>
                         <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}</span>
                       </div>
                       <div className="text-base leading-relaxed whitespace-pre-line mb-2">{c.content}</div>

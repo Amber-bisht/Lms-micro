@@ -12,11 +12,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 app.use(cors({
-  origin: config.NODE_ENV === 'production' 
+  origin: config.NODE_ENV === 'production'
     ? ['https://lms.amberbisht.me']
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
 }));
+
+// Debug middleware
+app.use((req, res, next) => {
+  if (req.path !== '/health') {
+    logger.info(`[COMMUNITY REQUEST] ${req.method} ${req.path}`);
+    if (req.method === 'POST' && req.body) {
+      logger.info(`[COMMUNITY REQUEST] Body: ${JSON.stringify(req.body)}`);
+    }
+  }
+  next();
+});
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'healthy', service: 'community-service' });

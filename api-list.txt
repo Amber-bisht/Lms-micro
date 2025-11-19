@@ -1,0 +1,246 @@
+================================================================================
+                    LMS MICROSERVICES - API ENDPOINTS LIST
+================================================================================
+
+This document lists all API endpoints across all microservices and indicates
+which ones are used in the frontend (.ts/.tsx files).
+
+Legend:
+  [✓] = Used in Frontend (.ts/.tsx files)
+  [✗] = Not Used in Frontend (Internal API call or unused)
+  [~] = Partially Used or Deprecated
+
+================================================================================
+                        AUTH SERVICE APIs
+                        Base Path: /api/auth
+================================================================================
+
+PUBLIC ROUTES:
+  [✓] POST   /api/auth/register                    - User registration  -  we use https://api.lms.amberbisht.me/api/auth/google this api to login + register i guess   
+  [✓] POST   /api/auth/login                       - User login -  we use https://api.lms.amberbisht.me/api/auth/google this api to login + register i guess  
+  [✓] POST   /api/auth/logout                      - User logout - logout api is there in frontend ?
+  [✓] POST   /api/auth/validate-token               - Validate JWT token
+  [✓] POST   /api/auth/admin-login-google           - Admin Google login
+
+OAUTH ROUTES:
+  [✓] GET    /api/auth/google                       - Initiate Google OAuth
+  [~] GET    /api/auth/github                       - Initiate GitHub OAuth (commented out)
+  [✓] GET    /api/auth/oauth/google/callback        - Google OAuth callback
+  [~] GET    /api/auth/oauth/github/callback        - GitHub OAuth callback (commented out)
+  [✓] GET    /api/auth/oauth/success                - OAuth success redirect
+  [✓] GET    /api/auth/oauth/error                  - OAuth error redirect
+
+PROTECTED ROUTES (require authentication):
+  [✓] GET    /api/auth/me                           - Get current user
+  [✓] GET    /api/auth/user/enrollments             - Get current user enrollments
+  [✓] PUT    /api/auth/profile                      - Update user profile
+  [✓] GET    /api/auth/profile                      - Get user profile
+  [✓] PUT    /api/auth/profile/update               - Create or update profile
+  [✗] DELETE /api/auth/account                      - Delete user account  - no needed remove 
+  [✓] GET    /api/auth/profile/user/enrollments     - Get profile enrollments
+
+USER PROFILE ROUTES:
+  [✓] GET    /api/auth/users/:id/profile            - Get user profile by ID
+  [✓] GET    /api/auth/users/username/:username     - Get user profile by username
+  [✓] GET    /api/auth/users/:id/enrollments        - Get user enrollments
+  [✓] GET    /api/auth/users/:id/activity           - Get user activity
+
+ADMIN ROUTES:
+  [✓] GET    /api/auth/users                        - Get all users (admin)
+  [✓] PUT    /api/auth/users/:id/ban                - Ban user
+  [✓] GET    /api/auth/blocked-ips                  - Get blocked IPs
+  [✓] DELETE /api/auth/blocked-ips/:ipAddress      - Delete blocked IP
+  [✓] GET    /api/auth/rate-limits                  - Get rate limits
+  [✓] GET    /api/auth/permanent-bans               - Get permanent bans
+  [✓] POST   /api/auth/ban-ip                       - Ban IP address
+  [✓] POST   /api/auth/ban-user                     - Ban user (alternative)
+  [✓] DELETE /api/auth/unban-ip/:target             - Unban IP address
+  [✓] DELETE /api/auth/unban-user/:target           - Unban user
+
+================================================================================
+                        COURSE SERVICE APIs
+                        Base Path: /api/courses
+================================================================================
+
+PUBLIC COURSE ENDPOINTS:
+  [✓] GET    /api/courses                           - Get all courses
+  [✓] GET    /api/courses?admin=true                - Get all courses (admin view)
+  [✓] GET    /api/courses/:id                       - Get course by ID or slug
+  [✓] GET    /api/courses/:slug/:lessonId           - Get video playback URL
+
+COURSE CRUD (ADMIN):
+  [✓] POST   /api/courses/create                    - Create new course
+  [✓] PUT    /api/courses/:id                       - Update course
+  [✓] DELETE /api/courses/:id                       - Delete course
+
+LESSON MANAGEMENT:
+  [✓] GET    /api/courses/:courseId/lessons        - Get lessons by course ID
+  [✓] GET    /api/lessons/:id                       - Get lesson by ID
+  [✓] POST   /api/courses/:courseId/lessons        - Create new lesson
+  [✓] PUT    /api/lessons/:id                       - Update lesson
+  [✓] DELETE /api/lessons/:id                       - Delete lesson
+  [✓] GET    /api/courses/slug/:slug/lessons/:lessonId - Get lesson by slug and ID
+
+RATING ENDPOINTS:
+  [✗] PATCH  /api/courses/:id/rating                - Update course rating
+
+ENROLLMENT ENDPOINTS:
+  [✓] POST   /api/courses/:courseId/enroll         - Enroll in course
+  [✓] GET    /api/courses/:courseId/enrollment      - Get enrollment status
+  [✓] GET    /api/courses/:courseId/completion      - Get completion status
+  [✓] POST   /api/courses/:courseId/complete        - Complete course
+  [✓] POST   /api/courses/:courseId/lessons/:lessonId/progress - Update lesson progress
+  [✓] POST   /api/courses/slug/:slug/enroll         - Enroll in course by slug
+  [✓] GET    /api/courses/slug/:slug/enrollment     - Get enrollment status by slug
+  [✓] GET    /api/courses/:courseId/enrollment-status?userId=:userId - Get enrollment status (admin)
+  [✓] GET    /api/courses/user/:userId/enrollments  - Get user enrollment history
+
+LESSON COMPLETION (from use-course-completion.ts):
+  [✓] POST   /api/courses/:courseId/lessons/:lessonId/complete - Mark lesson complete
+  [✗] DELETE /api/courses/:courseId/lessons/:lessonId/complete - Unmark lesson complete
+
+================================================================================
+                        COMMUNITY SERVICE APIs
+                        Base Path: /api/comments, /api/reviews
+================================================================================
+
+COMMENT ROUTES:
+  [✓] GET    /api/comments/:id                      - Get comments for course
+  [✓] POST   /api/comments/:id                      - Add comment to course
+  [✓] DELETE /api/comments/:commentId               - Delete comment
+  [✓] DELETE /api/admin/comments/:commentId         - Delete comment (admin)
+
+REVIEW ROUTES:
+  [✓] GET    /api/reviews/course/:courseId          - Get course reviews
+  [✓] GET    /api/reviews/course/:courseId/user/:userId - Get user review for course
+  [✓] POST   /api/reviews                           - Create review
+  [✗] PUT    /api/reviews/:id                       - Update review
+  [✗] DELETE /api/reviews/:id                       - Delete review
+  [✗] GET    /api/testimonials                      - Get testimonials
+
+================================================================================
+                        UPLOADER SERVICE APIs
+                        Base Path: /api/videos, /api/upload
+================================================================================
+
+VIDEO ROUTES:
+  [✓] POST   /api/videos/upload                     - Upload video file (MP4)
+  [✓] POST   /api/videos/youtube                    - Add YouTube video
+  [✓] POST   /api/videos/external-hls               - Add external HLS video
+  [✓] GET    /api/videos                            - Get all videos (admin)
+  [✓] GET    /api/videos/:id                        - Get video by ID
+  [✓] GET    /api/videos/:id/playlist.m3u8          - Get signed HLS playlist
+  [✓] DELETE /api/videos/:id                        - Delete video
+  [✗] GET    /api/videos/user/:userId               - Get user's videos
+
+UPLOAD ROUTES:
+  [✗] POST   /api/upload/single                     - Upload single file
+  [✗] POST   /api/upload/multiple                   - Upload multiple files
+  [✗] GET    /api/upload/user/:userId               - Get user files
+  [✗] GET    /api/upload/:id                        - Get file by ID
+  [✗] DELETE /api/upload/:id                       - Delete file
+  [✗] POST   /api/upload/s3/presigned-upload        - Generate presigned upload URL
+  [✗] GET    /api/upload/s3/presigned-download/:id - Generate presigned download URL
+  [✗] GET    /api/upload/s3/config                  - Get S3 configuration
+
+FILE-TO-LINK ROUTES (Deprecated): - no need remove all 
+  [~] GET    /api/file-to-link/proxy/:fileId(*)     - Proxy route (deprecated)
+  [~] HEAD   /api/file-to-link/proxy/:fileId(*)     - HEAD request proxy (deprecated)
+  [~] GET    /api/file-to-link/cookies              - Generate cookies (deprecated)
+
+================================================================================
+                        MEDIA SERVICE APIs
+                        Base Path: /api/media
+================================================================================
+
+YOUTUBE ROUTES: - no needed 
+  [✗] GET    /api/media/youtube/video/:videoId      - Get YouTube video info
+  [✗] GET    /api/media/youtube/search              - Search YouTube videos
+
+DAILYMOTION ROUTES: no needed
+  [✗] GET    /api/media/dailymotion/video/:videoId - Get Dailymotion video info
+  [✗] GET    /api/media/dailymotion/search          - Search Dailymotion videos
+
+GENERAL ROUTES: no needed
+  [✗] GET    /api/media/embed/:platform/:videoId    - Get video embed info
+
+NOTE: Frontend uses direct YouTube API calls in youtube-utils.ts instead of media service
+
+================================================================================
+                        ADMIN SERVICE APIs
+                        Base Path: /api/admin
+================================================================================
+
+SYSTEM STATS:
+  [✓] GET    /api/admin/stats                       - Get system statistics
+
+REDIS MANAGEMENT:
+  [✓] GET    /api/admin/redis/keys?pattern=:pattern - Get Redis keys
+  [✓] GET    /api/admin/redis/key/:key              - Get Redis value
+  [✓] DELETE /api/admin/redis/key/:key              - Delete Redis key
+  [✓] POST   /api/admin/redis/flush                 - Flush Redis cache
+  [✓] GET    /api/admin/redis/info                  - Get Redis info
+  [✓] POST   /api/admin/redis/clear-pattern         - Clear cache by pattern
+
+================================================================================
+                        API GATEWAY ROUTES
+                        Base Path: /
+================================================================================
+
+HEALTH CHECK:
+  [✗] GET    /health                                - Health check endpoint
+
+TEST ENDPOINTS: - no needed remove 
+  [✗] POST   /api/test-reviews                      - Test reviews endpoint (internal)
+
+CUSTOM ENROLLMENT ROUTES (with auth middleware):
+  [✓] POST   /api/courses/:courseId/enroll         - Enroll in course (with auth)
+  [✓] POST   /api/courses/:courseId/complete       - Complete course (with auth)
+
+================================================================================
+                        FRONTEND API USAGE SUMMARY
+================================================================================
+
+USED IN FRONTEND (.ts/.tsx files):
+  - All auth endpoints (login, register, logout, OAuth, profile)
+  - All course endpoints (CRUD, lessons, enrollment, completion)
+  - All comment endpoints
+  - All review endpoints (create, get)
+  - Video management endpoints (upload, YouTube, HLS, delete, get)
+  - Admin endpoints (stats, Redis management, user management)
+  - Enrollment and progress tracking endpoints
+
+NOT USED IN FRONTEND (Internal/Unused):
+  - Account deletion  - no need remove from backend 
+  - Review update/delete endpoints - delete this api 
+  - Testimonials endpoint - delete this 
+  - User video listing endpoint - delete this 
+  - File upload endpoints (single/multiple) - delete this
+   - S3 presigned URL endpoints - i dont how we upload view i guess we upload to backend then backend job then upload no idea
+  - Media service endpoints (YouTube/Dailymotion search) - no need remove 
+  - File-to-link proxy endpoints (deprecated) - remove 
+  - Health check endpoint - leave it no need in frontend but usefull 
+  - Course rating update endpoint - nneed to added - in frontend 
+
+PARTIALLY USED / DEPRECATED:
+  - GitHub OAuth (commented out in routes) - remove it
+  - File-to-link proxy routes (deprecated, frontend handles directly) - remove it
+  - Some review endpoints (only create and get are used) - remove it 
+
+================================================================================
+                        NOTES
+================================================================================
+
+1. Frontend uses apiGet, apiPost, apiPut, apiDelete from lib/api.ts for most calls
+2. Some endpoints use direct fetch() calls (especially in course-videos.tsx)
+3. Admin API functions are centralized in lib/admin-api.ts
+4. OAuth callbacks are handled server-side with redirects
+5. File-to-link integration is deprecated - frontend now handles directly
+6. Media service exists but frontend uses direct YouTube API calls instead
+7. Some endpoints like /api/users/:username are called but route may not exist in auth service
+8. Profile endpoints have some duplication between /api/auth/profile and /api/profile
+
+================================================================================
+                        END OF API LIST
+================================================================================
+

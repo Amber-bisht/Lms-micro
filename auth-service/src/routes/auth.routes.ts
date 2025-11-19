@@ -11,6 +11,7 @@ router.post('/login', authController.login);
 router.post('/logout', authController.logout);
 router.post('/validate-token', authController.validateToken);
 router.post('/admin-login-google', authController.adminLoginWithGoogle);
+router.get('/validate-session', authController.validateSession);
 
 // ============== OAUTH ROUTES ==============
 // OAuth initiation routes

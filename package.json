@@ -1,19 +1,23 @@
 {
-  "name": "docker-logs-checker",
+  "name": "lms-microservices",
   "version": "1.0.0",
-  "description": "Script to check Docker logs on remote server",
-  "main": "check-docker-logs.js",
+  "description": "LMS Microservices - Learning Management System",
   "scripts": {
     "start": "node check-docker-logs.js",
-    "check-logs": "node check-docker-logs.js"
+    "check-logs": "node check-docker-logs.js",
+    "install:all": "concurrently -n \"API-GATEWAY,AUTH,COURSE,COMMUNITY,ADMIN,MEDIA,UPLOADER,FRONTEND\" \"npm install --prefix api-gateway\" \"npm install --prefix auth-service\" \"npm install --prefix course-service\" \"npm install --prefix community-service\" \"npm install --prefix admin-service\" \"npm install --prefix media-service\" \"npm install --prefix uploader-service\" \"npm install --prefix 1-frontend\"",
+    "dev:all": "concurrently -n \"API-GATEWAY,AUTH,COURSE,COMMUNITY,ADMIN,MEDIA,UPLOADER,FRONTEND\" -c \"blue,green,yellow,magenta,cyan,red,white,gray\" \"npm run dev --prefix api-gateway\" \"npm run dev --prefix auth-service\" \"npm run dev --prefix course-service\" \"npm run dev --prefix community-service\" \"npm run dev --prefix admin-service\" \"npm run dev --prefix media-service\" \"npm run dev --prefix uploader-service\" \"npm run dev --prefix 1-frontend\""
   },
   "dependencies": {
     "ssh2": "^1.17.0"
   },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
   "keywords": [
-    "docker",
-    "logs",
-    "ssh"
+    "lms",
+    "microservices",
+    "learning-management-system"
   ],
   "author": "",
   "license": "ISC"
